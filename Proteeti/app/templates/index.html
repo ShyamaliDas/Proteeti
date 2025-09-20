@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Proteeti — A community-powered safety platform for women</title>
+
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Optional: Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <style>
+    /* Small custom styles */
+    body { padding-top: 70px; }
+    .hero { padding: 60px 0; background: linear-gradient(180deg,#ffeef0 0%, #fff 100%); }
+    .sos-btn { background: linear-gradient(90deg,#ff3b3b,#ff6666); border: none; color: white; font-weight:700; }
+    #map { height: 400px; width: 100%; border-radius: .5rem; border: 1px solid #ddd; }
+    .feature-icon { font-size: 2.4rem; color:#d63384; }
+    footer { background:#f8f9fa; padding: 24px 0; margin-top: 40px; }
+    .timeline { font-size:.95rem; }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar navbar-expand-lg navbar-light bg-white fixed-top shadow-sm">
+    <div class="container">
+      <a class="navbar-brand fw-bold" href="/">Proteeti <small class="text-muted">প্রতীতি</small></a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="navMain">
+        <ul class="navbar-nav ms-auto align-items-lg-center">
+          <li class="nav-item"><a class="nav-link" href="#features">Features</a></li>
+          <li class="nav-item"><a class="nav-link" href="#map-section">Map</a></li>
+          <li class="nav-item"><a class="nav-link" href="#resources">Resources</a></li>
+          <li class="nav-item"><a class="nav-link" href="/login">Login</a></li>
+          <li class="nav-item ms-2"><a class="btn btn-outline-primary" href="/register">Register</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="container">
+      <div class="row align-items-center">
+        <div class="col-lg-7">
+          <h1 class="display-5 fw-bold">Proteeti (প্রতীতি)</h1>
+          <p class="lead text-muted">A community-powered safety platform for women — live SOS alerts, crowd-sourced safety map, safe-route suggestions and quick access to helplines.</p>
+
+          <div class="d-flex gap-2 mt-4">
+            <a class="btn btn-primary btn-lg" href="/register">Get Started</a>
+            <button id="sos-test-btn" class="btn sos-btn btn-lg" aria-label="Send SOS (test)">🚨 SOS (Test)</button>
+            <a class="btn btn-outline-secondary btn-lg" href="#features">Learn More</a>
+          </div>
+        </div>
+
+        <div class="col-lg-5">
+          <div class="card p-3 shadow-sm">
+            <h6 class="mb-2">Quick access</h6>
+            <ul class="list-unstyled mb-0">
+              <li><strong>Emergency Alert:</strong> One-click SOS to trusted contacts</li>
+              <li><strong>Community Map:</strong> Report & view unsafe zones</li>
+              <li><strong>Resources:</strong> Helplines & NGOs</li>
+              <li><strong>Safe Routes:</strong> Route suggestions based on reports</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- FEATURES -->
+  <section id="features" class="py-5">
+    <div class="container">
+      <h2 class="mb-4">Features</h2>
+      <div class="row g-4">
+        <div class="col-md-4">
+          <div class="card h-100 p-3">
+            <div class="d-flex align-items-start gap-3">
+              <div><i class="bi bi-bell-fill feature-icon"></i></div>
+              <div>
+                <h5>Emergency Alert System</h5>
+                <p class="small text-muted mb-0">One-click SOS sends your live location and recorded audio to trusted contacts via SMS/email.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <div class="card h-100 p-3">
+            <div class="d-flex align-items-start gap-3">
+              <div><i class="bi bi-geo-alt-fill feature-icon"></i></div>
+              <div>
+                <h5>Community Safety Map</h5>
+                <p class="small text-muted mb-0">Crowd-sourced unsafe area reports appear on the map in realtime for all users.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <div class="card h-100 p-3">
+            <div class="d-flex align-items-start gap-3">
+              <div><i class="bi bi-shield-lock-fill feature-icon"></i></div>
+              <div>
+                <h5>Safe Route Planner</h5>
+                <p class="small text-muted mb-0">Route suggestions ranked by report density and recency to avoid risky areas.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 mt-3">
+          <div class="card h-100 p-3">
+            <div class="d-flex align-items-start gap-3">
+              <div><i class="bi bi-people-fill feature-icon"></i></div>
+              <div>
+                <h5>User Accounts & Trusted Contacts</h5>
+                <p class="small text-muted mb-0">Create accounts, add trusted contacts, and manage alert preferences.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 mt-3">
+          <div class="card h-100 p-3">
+            <div class="d-flex align-items-start gap-3">
+              <div><i class="bi bi-hand-thumbs-up-fill feature-icon"></i></div>
+              <div>
+                <h5>Voting & Verification</h5>
+                <p class="small text-muted mb-0">Users upvote or verify reports to improve map accuracy and reduce false reports.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- MAP & REPORTS -->
+  <section id="map-section" class="py-5 bg-light">
+    <div class="container">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">Community Safety Map</h2>
+        <div>
+          <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#reportModal">Report an unsafe area</button>
+        </div>
+      </div>
+
+      <div id="map" aria-label="Safety map - Google Maps placeholder">
+        <!-- Google Maps will be initialized here by script -->
+      </div>
+
+      <small class="text-muted d-block mt-2">Map uses Google Maps JavaScript API. Replace the API key in the script tag before use.</small>
+    </div>
+  </section>
+
+  <!-- RESOURCES -->
+  <section id="resources" class="py-5">
+    <div class="container">
+      <h2>Safety Resources</h2>
+      <p class="text-muted">Quick contacts and helplines you can reach instantly.</p>
+
+      <div class="row">
+        <div class="col-md-6">
+          <ul class="list-group">
+            <li class="list-group-item"><strong>Emergency Police (Bangladesh):</strong> 999 / local police number</li>
+            <li class="list-group-item"><strong>Women Helpline:</strong> 109</li>
+            <li class="list-group-item"><strong>Counseling / NGO:</strong> Example NGO — 01234-567890</li>
+          </ul>
+        </div>
+
+        <div class="col-md-6">
+          <h6>How to use</h6>
+          <ol>
+            <li>Register and add trusted contacts.</li>
+            <li>Share location with trusted contact when traveling alone.</li>
+            <li>Use SOS button in emergencies, or report unsafe areas on map.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+
+  <!-- FOOTER -->
+  <footer class="mt-4">
+    <div class="container d-flex justify-content-between align-items-center">
+      <div>
+        <strong>Proteeti</strong> — community safety platform for women • Shahjalal University of Science & Technology
+      </div>
+      <div class="text-end">
+        <small class="text-muted">© 2025 Protiti • <a href="/privacy">Privacy</a> • <a href="/terms">Terms</a></small>
+      </div>
+    </div>
+  </footer>
+
+  <!-- REPORT MODAL -->
+  <div class="modal fade" id="reportModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <form id="reportForm" class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Report an unsafe area</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-2">
+            <label class="form-label">Category</label>
+            <select id="reportCategory" class="form-select" required>
+              <option>Harassment</option>
+              <option>Unsafe Lighting</option>
+              <option>Suspicious Activity</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Description (optional)</label>
+            <textarea id="reportDescription" class="form-control" rows="3"></textarea>
+          </div>
+          <div class="mb-2">
+            <small class="text-muted">Your current geolocation will be attached to this report.</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Send report</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- SOS CONFIRMATION (client-only for demo) -->
+  <div class="modal fade" id="sosModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content p-3">
+        <div class="modal-body text-center">
+          <h5 class="mb-3">Send SOS?</h5>
+          <p class="text-muted">This will send your current location to your trusted contacts. (Demo mode: no messages will be sent until server is configured.)</p>
+          <div class="d-flex justify-content-center gap-2">
+            <button id="confirmSOS" class="btn sos-btn">Yes, send SOS</button>
+            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap 5 JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Google Maps JS: Replace YOUR_GOOGLE_MAPS_API_KEY with your key before production -->
+  
+<script>
+const GOOGLE_MAPS_API_KEY = "API_KEY";
+
+let map, selectedMarker;
+
+  
+
+// Initialize Google Map
+function initMap() {
+  const center = { lat: 23.7806, lng: 90.2794 }; // Sylhet/Dhaka example
+  map = new google.maps.Map(document.getElementById("map"), {
+    zoom: 13,
+    center,
+  });
+
+  // Sample marker (demo)
+  new google.maps.Marker({ position: center, map, title: "Demo center" });
+
+  // Click-to-select marker for reporting
+  map.addListener("click", (event) => {
+    placeSelectedMarker(event.latLng);
+  });
+
+  // TODO: fetch existing reports from server or Firebase
+  // Example:
+  // fetch("/reports").then(...).then(data => place markers ...)
+}
+
+// Place or move the marker that user selects on map
+function placeSelectedMarker(latLng) {
+  if (selectedMarker) {
+    selectedMarker.setPosition(latLng);
+  } else {
+    selectedMarker = new google.maps.Marker({
+      position: latLng,
+      map,
+      draggable: true,
+      title: "Selected report location",
+    });
+  }
+}
+
+// Handle report submission
+document.getElementById("reportForm").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+
+  const category = document.getElementById("reportCategory").value;
+  const description = document.getElementById("reportDescription").value;
+
+  // Use selected location if available, else fallback to live location
+  if (selectedMarker) {
+    submitReport(selectedMarker.getPosition().lat(), selectedMarker.getPosition().lng(), category, description);
+  } else if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => submitReport(pos.coords.latitude, pos.coords.longitude, category, description),
+      (err) => alert("Could not get location: " + err.message),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  } else {
+    alert("Please select a location on the map or enable geolocation.");
+  }
+});
+
+async function submitReport(lat, lng, category, description) {
+  const payload = { lat, lng, category, description, timestamp: Date.now() };
+  try {
+    const res = await fetch("/reports", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      alert("Report submitted!");
+      bootstrap.Modal.getInstance(document.getElementById("reportModal")).hide();
+
+      // Place a permanent marker for the report
+      new google.maps.Marker({ position: { lat, lng }, map, title: category });
+      // Clear selection marker
+      if (selectedMarker) { selectedMarker.setMap(null); selectedMarker = null; }
+    } else {
+      alert("Failed: " + (data.error || res.statusText));
+    }
+  } catch (err) {
+    alert("Network error: " + err.message);
+  }
+}
+
+// // Dynamically load Google Maps script
+// (function loadGoogleMaps() {
+//   if (!GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY.includes("YOUR_")) return;
+//   const s = document.createElement("script");
+//   s.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&callback=initMap`;
+//   s.async = true;
+//   s.defer = true;
+//   document.head.appendChild(s);
+// })();
+
+
+
+</script>
+
+  <div id="map" style="height:400px;"></div>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
+<script>
+
+  var map2 = L.map('map').setView([23.8103, 90.4125], 12); // Dhaka
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map2);
+
+  
+
+</script>
+
+
+
+  <!-- Firebase real-time (OPTIONAL) - replace with your Firebase config object -->
+  <script>
+    /* Example Firebase snippet (uncomment and fill config to use)
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.6.0/firebase-app.js";
+    import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/10.6.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "API_KEY",
+      authDomain: "PROJECT.firebaseapp.com",
+      databaseURL: "https://PROJECT.firebaseio.com",
+      projectId: "PROJECT",
+      storageBucket: "PROJECT.appspot.com",
+      messagingSenderId: "SENDER_ID",
+      appId: "APP_ID"
+    };
+
+    const fb = initializeApp(firebaseConfig);
+    const db = getDatabase(fb);
+
+    // Listen for new reports and add map markers
+    const reportsRef = ref(db, 'reports/');
+    onChildAdded(reportsRef, snapshot => {
+      const report = snapshot.val();
+      // create marker on map using report.lat, report.lng
+    });
+    */
+  </script>
+
+  <!-- Client logic: SOS & report submission (demo) -->
+  <script>
+    // Helper: show modal by id
+    function showModal(id) {
+      const el = document.getElementById(id);
+      const modal = new bootstrap.Modal(el);
+      modal.show();
+    }
+
+    document.getElementById("sos-test-btn").addEventListener("click", () => {
+      showModal("sosModal");
+    });
+
+    document.getElementById("confirmSOS").addEventListener("click", async () => {
+      // Get geolocation
+      if (!navigator.geolocation) {
+        alert("Geolocation is not supported by your browser.");
+        return;
+      }
+      // UI feedback
+      document.getElementById("confirmSOS").innerText = "Sending...";
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const payload = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+          timestamp: pos.timestamp
+        };
+
+        // Send to server endpoint POST /sos (implement in Flask)
+        try {
+          const res = await fetch("/sos", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" /* add CSRF header here if required */ },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+          if (res.ok) {
+            alert("SOS sent successfully (server response: " + (data.message || "ok") + ")");
+          } else {
+            alert("Failed to send SOS: " + (data.error || res.statusText));
+          }
+        } catch (err) {
+          alert("Network/server error while sending SOS: " + err.message);
+        } finally {
+          document.getElementById("confirmSOS").innerText = "Yes, send SOS";
+          // close modal
+          bootstrap.Modal.getInstance(document.getElementById("sosModal")).hide();
+        }
+      }, (err) => {
+        alert("Could not get location: " + err.message);
+        document.getElementById("confirmSOS").innerText = "Yes, send SOS";
+      }, { enableHighAccuracy: true, timeout: 10000 });
+    });
+
+    // Report form submit (sends to /reports)
+    document.getElementById("reportForm").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      // get location
+      if (!navigator.geolocation) { alert("Geolocation not supported"); return; }
+      const category = document.getElementById("reportCategory").value;
+      const description = document.getElementById("reportDescription").value;
+
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const payload = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          category, description, timestamp: pos.timestamp
+        };
+        try {
+          const res = await fetch("/reports", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+          if (res.ok) {
+            alert("Report submitted. Thank you!");
+            bootstrap.Modal.getInstance(document.getElementById("reportModal")).hide();
+          } else {
+            alert("Failed to submit report: " + (data.error || res.statusText));
+          }
+        } catch (err) {
+          alert("Network/server error: " + err.message);
+        }
+      }, (err) => {
+        alert("Could not get location: " + err.message);
+      }, { enableHighAccuracy: false, timeout: 10000 });
+    });
+  </script>
+
+</body>
+</html>

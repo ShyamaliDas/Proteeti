@@ -1,0 +1,17 @@
+body {
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+    margin: 0;
+    padding: 0;
+}
+
+.card {
+    border-radius: 10px;
+}
+
+button.sos-btn {
+    background: linear-gradient(90deg,#ff3b3b,#ff6666);
+    border: none;
+    color: white;
+    font-weight:700;
+}
