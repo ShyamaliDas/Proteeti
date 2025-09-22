@@ -1,17 +1,74 @@
+/* General Body and Main Content adjustments */
 body {
-    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #f8f9fa;
-    margin: 0;
-    padding: 0;
+    padding-top: 75px; 
 }
 
-.card {
+/* Navbar Enhancements */
+.navbar {
+    background: rgba(139, 0, 0, 0.9);
+    backdrop-filter: blur(10px); 
+    -webkit-backdrop-filter: blur(10px); 
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 15px 0; 
+    transition: all 0.3s ease-in-out;
+}
+
+.navbar-brand img {
+    height: 50px; 
+    width: 50px;
+}
+
+.navbar .nav-link {
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 500;
+    transition: color 0.3s ease-in-out;
+}
+
+.navbar .nav-link:hover {
+    color: #fff;
+}
+
+/* Hero Section Styles */
+.hero-section {
+    position: relative;
+    height: 60vh;
+    min-height: 450px; 
+    background-image: url('../img/hero-image.png'); 
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 100px;
+}
+
+.hero-section .hero-content {
+    padding: 3rem;
     border-radius: 10px;
 }
 
-button.sos-btn {
-    background: linear-gradient(90deg,#ff3b3b,#ff6666);
-    border: none;
-    color: white;
-    font-weight:700;
+.btn-hero {
+    background-color: #8B0000;
+    border-color: #8B0000;
+    color: #fff;
+    transition: background-color 0.3s ease;
+}
+
+.btn-hero:hover {
+    background-color: #CD5C5C;
+    border-color: #CD5C5C;
+}
+
+/* Feature Icons */
+.feature-icon {
+    height: 100px; 
+    width: 100px;
+    border-radius: 15px; 
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease-in-out;
+}
+
+.feature-icon:hover {
+    transform: translateY(-5px);
 }
