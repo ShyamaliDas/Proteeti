@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = 'proteeti_secret_key_2025'  # Change this for production!
+app.secret_key = 'proteeti'  
 
 # File paths for data storage
 USERS_FILE = 'data/users.json'
@@ -123,7 +123,6 @@ def send_sos():
             
         sos_data = request.get_json()
         
-        # Log the SOS alert (you can save this to a file too)
         print("🔴 SOS ALERT RECEIVED:")
         print(f"User: {session.get('username')}")
         print(f"Location: {sos_data.get('lat')}, {sos_data.get('lng')}")
@@ -163,7 +162,7 @@ def submit_report():
         reports.append(new_report)
         save_reports(reports)
         
-        print("📍 NEW HAZARD REPORT SAVED:")
+        print("NEW HAZARD REPORT SAVED:")
         print(f"User: {new_report['username']}")
         print(f"Location: {new_report['lat']}, {new_report['lng']}")
         print(f"Category: {new_report['category']}")
@@ -190,4 +189,5 @@ if __name__ == '__main__':
     if not os.path.exists(REPORTS_FILE):
         save_reports([])
     
-    app.run(debug=True)
+   
+    app.run(host="0.0.0.0", port=5000, debug=True)
