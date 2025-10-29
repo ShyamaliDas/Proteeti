@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proteeti</title>
+    <link rel="icon" href="{{ url_for('static', filename='img/Logo.png') }}" width="50" height="50" type="image/png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+        <div class="container">
+            <a class="navbar-brand fw-bold d-flex align-items-center" href="/">
+                <img src="{{ url_for('static', filename='img/favicon1.png') }}" alt="Proteeti Logo" class="me-2" height="50" width="50">
+                Proteeti
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+                    <li class="nav-item"><a class="nav-link" href="/">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/sos">SOS</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/map">Hazard Map</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/resources">Resources</a></li>
+                    
+                    {% if session.get('loggedin') %}
+                        <li class="nav-item"><span class="nav-link">Hi, {{ session.get('username') }}</span></li>
+                        <li class="nav-item"><a class="nav-link" href="/logout">Logout</a></li>
+                    
+                    {% elif google and google.authorized %}
+                        {% set userinfo = google.get('/oauth2/v2/userinfo').json() %}
+                        <li class="nav-item"><span class="nav-link">{{ userinfo['name'] }}</span></li>
+                        <li class="nav-item"><a class="nav-link" href="/logout">Logout</a></li>
+                    {% else %}
+                        <li class="nav-item"><a class="nav-link" href="/login">Login</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/register">Register</a></li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container my-5" style="margin-top: 100px !important;">
+        {% block content %}{% endblock %}
+    </div>
+
+    <footer class="text-center py-3 bg-light mt-auto">
+        <p class="mb-0 text-muted">&copy; 2025 Proteeti. All Rights Reserved.</p>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <div class="modal fade" id="sosModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content p-3">
+                <div class="modal-body text-center">
+                    <h5 class="mb-3">Send SOS?</h5>
+                    <p class="text-muted">This will send your current location to your trusted contacts.</p>
+                    <div class="d-flex justify-content-center gap-2">
+                        <button id="confirmSOS" class="btn btn-danger">Yes, send SOS</button>
+                        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showModal(id) {
+            const el = document.getElementById(id);
+            const modal = new bootstrap.Modal(el);
+            modal.show();
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const sosBtn = document.getElementById('sosBtn');
+            if (sosBtn) {
+                sosBtn.addEventListener('click', () => {
+                    showModal("sosModal");
+                });
+            }
+        });
+
+        const confirmSOSBtn = document.getElementById('confirmSOS');
+        if (confirmSOSBtn) {
+            confirmSOSBtn.addEventListener('click', async function() {
+                const button = this;
+                button.textContent = "Sending...";
+                button.disabled = true;
+                
+                try {
+                    if (!navigator.geolocation) {
+                        alert("Geolocation is not supported by your browser.");
+                        button.textContent = "Yes, send SOS";
+                        button.disabled = false;
+                        return;
+                    }
+                    
+                    navigator.geolocation.getCurrentPosition(async (position) => {
+                        const sosData = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude,
+                            accuracy: position.coords.accuracy,
+                            timestamp: new Date().toISOString(),
+                            username: '{{ session.get("username") if session.get("loggedin") else "guest" }}'
+                        };
+                        
+                        const response = await fetch('/send_sos', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(sosData)
+                        });
+                        
+                        if (response.ok) {
+                            alert('SOS alert sent successfully!');
+                        } else {
+                            alert('Error sending SOS: ' + await response.text());
+                        }
+                        
+                        const modalEl = document.getElementById('sosModal');
+                        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                        if (modalInstance) modalInstance.hide();
+                        
+                        button.textContent = "Yes, send SOS";
+                        button.disabled = false;
+                        
+                    }, (error) => {
+                        alert('Error getting location: ' + error.message);
+                        button.textContent = "Yes, send SOS";
+                        button.disabled = false;
+                    });
+                    
+                } catch (error) {
+                    alert('Error: ' + error.message);
+                    button.textContent = "Yes, send SOS";
+                    button.disabled = false;
+                }
+            });
+        }
+    </script>
+</body>
+</html>
