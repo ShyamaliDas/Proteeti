@@ -182,12 +182,12 @@ def get_reports_api():
     reports = load_reports()
     return jsonify(reports)
 
+# Initialize data files (but they won't persist on Vercel)
+if not os.path.exists(USERS_FILE):
+    save_users({})
+if not os.path.exists(REPORTS_FILE):
+    save_reports([])
+
+# For local development
 if __name__ == '__main__':
-    # Create initial data files if they don't exist
-    if not os.path.exists(USERS_FILE):
-        save_users({})
-    if not os.path.exists(REPORTS_FILE):
-        save_reports([])
-    
-   
     app.run(host="0.0.0.0", port=5000, debug=True)
