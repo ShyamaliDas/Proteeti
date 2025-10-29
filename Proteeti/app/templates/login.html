@@ -10,16 +10,24 @@
                     {% if error %}
                     <div class="alert alert-danger">{{ error }}</div>
                     {% endif %}
-                    
+
+                    <a href="{{ url_for('google.login') }}" class="btn btn-outline-danger w-100 mb-3">
+                    Continue with Google
+                    </a>
+
+
+
                     <form method="POST">
+                        
                         <div class="mb-3">
-                            <label class="form-label">Username</label>
-                            <input type="text" class="form-control" name="username" required>
+                        <label class="form-label">Username or Email</label>
+                        <input type="text" class="form-control"         name="username_or_email" required>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Password</label>
-                            <input type="password" class="form-control" name="password" required>
+                            <input type="text" class="form-control" name="password" required>
                         </div>
+
                         <button class="btn btn-danger w-100 btn-lg" style="background-color: #8B0000; border-color: #8B0000;">Login</button>
                         <p class="text-center mt-3">Don't have an account? <a href="/register" class="text-danger">Register here</a></p>
                     </form>

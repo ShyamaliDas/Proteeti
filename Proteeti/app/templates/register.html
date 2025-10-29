@@ -11,7 +11,24 @@
                     <div class="alert alert-danger">{{ error }}</div>
                     {% endif %}
                     
+                    <a href="{{ url_for('google.login') }}" class="btn btn-outline-danger w-100 mb-3">
+                    Continue with Google
+                    </a>
+
+                    <div class="or-divider my-4 d-flex align-items-center">
+                    <hr class="flex-grow-1">
+                    <span class="mx-3 text-muted fw-semibold" style="white-space:nowrap;font-size:18px;">OR</span>
+                    <hr class="flex-grow-1">
+                    </div>
+
+
+
+
                     <form method="POST">
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="email" required>
+                        </div>
                         <div class="mb-3">
                             <label class="form-label">Username</label>
                             <input type="text" class="form-control" name="username" required>
@@ -22,8 +39,10 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Confirm Password</label>
-                            <input type="password" class="form-control" name="confirm_password" required>
+                            <input type="password" class="form-control" name="confirmpassword" required>
                         </div>
+                        
+
                         <button class="btn btn-danger w-100 btn-lg" style="background-color: #8B0000; border-color: #8B0000;">Register</button>
                         <p class="text-center mt-3">Already have an account? <a href="/login" class="text-danger">Login here</a></p>
                     </form>
