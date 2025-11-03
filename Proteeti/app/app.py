@@ -6,14 +6,12 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 
-# Allow HTTP for OAuth in local dev
 os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
-app.secret_key = "proteeti_secret_key_2025"  # change in production
+app.secret_key = "proteeti_secret_key_2025"  
 
 # ======= Config / Paths =======
-DEV_MODE = False  # False = email the code via Brevo; True = show code on verify page
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 USERS_FILE = os.path.join(DATA_DIR, "users.json")
@@ -21,8 +19,8 @@ REPORTS_FILE = os.path.join(DATA_DIR, "reports.json")
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # ======= Google OAuth =======
-app.config["GOOGLE_OAUTH_CLIENT_ID"] = "ClientID"
-app.config["GOOGLE_OAUTH_CLIENT_SECRET"] = "ClientSecret"
+app.config["GOOGLE_OAUTH_CLIENT_ID"] = "client_ID"
+app.config["GOOGLE_OAUTH_CLIENT_SECRET"] = "client_Secret"
 google_bp = make_google_blueprint(
     client_id=app.config["GOOGLE_OAUTH_CLIENT_ID"],
     client_secret=app.config["GOOGLE_OAUTH_CLIENT_SECRET"],
@@ -50,15 +48,22 @@ def load_users():
 def save_user_record(username, email, password, verified=True):
     print("Saving users to:", os.path.abspath(USERS_FILE))
     users = load_users()
+    
+    existing_contacts = []
+    if username in users:
+        existing_contacts = users[username].get("trusted_contacts", [])
+    
     users[username] = {
         "password": password,
         "email": email,
         "created_at": users.get(username, {}).get("created_at", datetime.now().isoformat()),
         "verified": verified,
+        "trusted_contacts": existing_contacts
     }
     with open(USERS_FILE, "w") as f:
         json.dump(users, f, indent=4)
     print("Saved user:", username)
+
 
 def email_in_use(email):
     return any(u.get("email") == email for u in load_users().values())
@@ -73,36 +78,46 @@ def save_reports(reports):
     with open(REPORTS_FILE, "w") as f:
         json.dump(reports, f, indent=4)
 
-# ======= Email validation (regex + mailboxlayer) =======
+# ======= Email validation =======
 def is_valid_email(email):
     return re.fullmatch(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", email)
 
-MAILBOXLAYER_KEY = "key"
+MAILBOXLAYER_KEY = "mailboxlayer key"
 
 def mailboxlayer_check(email):
     url = f"http://apilayer.net/api/check?access_key={MAILBOXLAYER_KEY}&email={email}&smtp=1&format=1"
     try:
         resp = requests.get(url, timeout=10)
         data = resp.json()
+        
+        if not data.get("success", True) and "error" in data:
+            print(f"Mailboxlayer API error: {data['error']}")
+            return False, "Email verification service is unavailable"
+        
+        if not data.get("format_valid", False):
+            return False, "Email format is invalid."
+        if not data.get("mx_found", False):
+            return False, "Email domain has no MX records."
+        if not data.get("smtp_check", False):
+            return False, "Email address does not exist or cannot receive mail."
+        if data.get("disposable", False):
+            return False, "Disposable/temporary email addresses are not allowed."
+        return True, "Email is valid."
+        
+    except requests.Timeout:
+        print("Mailboxlayer API timeout")
+        return False, "Email verification service timed out"
     except Exception as e:
+        print(f"Mailboxlayer error: {e}")
         return False, f"Email verification service error: {e}"
 
-    if not data.get("format_valid", False):
-        return False, "Email format is invalid."
-    if not data.get("mx_found", False):
-        return False, "Email domain has no MX records."
-    if not data.get("smtp_check", False):
-        return False, "Email address does not exist or cannot receive mail."
-    if data.get("disposable", False):
-        return False, "Disposable/temporary email addresses are not allowed."
-    return True, "Email is valid."
 
 # ======= 6-digit code =======
 def generate_verification_code():
     return str(random.randint(100000, 999999))
 
 GMAIL_SENDER = "proteeti39@gmail.com"  
-GMAIL_APP_PASSWORD = "AppPass" 
+GMAIL_APP_PASSWORD = "gmail app password" 
 
 def send_verification_code(email, code):
     if DEV_MODE:
@@ -185,12 +200,11 @@ def register():
             error = "Username, email and password are required."
             return render_template("register.html", error=error)
 
-        # 1) local format
+        
         if not is_valid_email(email):
             error = "Please enter a valid email address."
             return render_template("register.html", error=error)
 
-        # 2) mailboxlayer deliverability
         ok, msg = mailboxlayer_check(email)
         if not ok:
             error = msg
@@ -282,6 +296,117 @@ def verify_email():
         else:
             error = "Verification code incorrect."
     return render_template("verify_email.html", error=error, show_code=show_code, code=(pending["code"] if show_code else None))
+
+@app.route("/account")
+def account():
+    if not session.get("loggedin"):
+        return redirect(url_for("login"))
+    
+    username = session.get("username")
+    users = load_users()
+    
+    # Find user data
+    user_data = None
+    for uname, info in users.items():
+        if uname == username or info.get("email") == username:
+            user_data = {
+                "username": uname,
+                "email": info.get("email"),
+                "trusted_contacts": info.get("trusted_contacts", [])
+            }
+            break
+    
+    if not user_data:
+        return redirect(url_for("logout"))
+    
+    return render_template("account.html", user=user_data)
+
+
+@app.route("/add_trusted_contact", methods=["POST"])
+def add_trusted_contact():
+    
+    try:
+        data = request.get_json()
+        contact_name = data.get("name", "").strip()
+        contact_email = data.get("email", "").strip()
+        contact_phone = data.get("phone", "").strip()
+        
+        if contact_email and not is_valid_email(contact_email):
+            return jsonify({"error": "Please enter a valid email address"}), 400
+    
+        ok, msg = mailboxlayer_check(contact_email)
+        if not ok:
+            return jsonify({"error": "Please enter a valid email address"}), 400
+        
+       
+        username = session.get("username")
+        users = load_users()
+
+        new_contact = {
+            "id": len(users[username]["trusted_contacts"]) + 1,
+            "name": contact_name,
+            "email": contact_email,
+            "phone": contact_phone
+        }
+        users[username]["trusted_contacts"].append(new_contact)
+        
+        # Save
+        with open(USERS_FILE, "w") as f:
+            json.dump(users, f, indent=4)
+        
+        return jsonify({
+            "message": "Trusted contact added successfully",
+            "contact": new_contact
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/remove_trusted_contact", methods=["POST"])
+def remove_trusted_contact():
+    if not session.get("loggedin"):
+        return jsonify({"error": "Please login first"}), 401
+    
+    try:
+        data = request.get_json()
+        contact_id = data.get("contact_id")
+        
+        print(f"DEBUG: Trying to remove contact_id: {contact_id}, type: {type(contact_id)}")  # DEBUG
+        
+        if contact_id is None:
+            return jsonify({"error": "Contact ID required"}), 400
+        
+        try:
+            contact_id = int(contact_id)
+        except (ValueError, TypeError):
+            return jsonify({"error": "Invalid contact ID"}), 400
+        
+        username = session.get("username")
+        users = load_users()
+        
+        
+      
+        if "trusted_contacts" in users[username]:
+            original_count = len(users[username]["trusted_contacts"])
+            users[username]["trusted_contacts"] = [
+                c for c in users[username]["trusted_contacts"] 
+                if c.get("id") != contact_id
+            ]
+            new_count = len(users[username]["trusted_contacts"])
+            print(f"DEBUG: Removed {original_count - new_count} contacts")  # DEBUG
+        
+        print(f"DEBUG: After removal: {users[username].get('trusted_contacts', [])}")  # DEBUG
+        
+        # Save
+        with open(USERS_FILE, "w") as f:
+            json.dump(users, f, indent=4)
+        
+        return jsonify({"message": "Trusted contact removed successfully"}), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 
 @app.route("/logout")
