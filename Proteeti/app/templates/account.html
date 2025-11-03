@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container" style="max-width: 900px; margin-top: 20px;">
+
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-lg border-0 mb-4">
+                <div class="card-body p-4">
+                    <h1 class="mb-4">
+                        <i class="fas fa-user-circle"></i> My Account
+                    </h1>
+
+                    <div class="alert alert-danger d-none" id="errorMessage"></div>
+                    <div class="alert alert-success d-none" id="successMessage"></div>
+
+                    <div class="mb-5">
+                        <h2 class="h4 mb-3 pb-2 border-bottom">Account Information</h2>
+                        <div class="row mb-2">
+                            <div class="col-md-4 fw-bold text-muted">Username:</div>
+                            <div class="col-md-8">{{ user.username }}</div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-md-4 fw-bold text-muted">Email:</div>
+                            <div class="col-md-8">{{ user.email }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Trusted Contacts Section -->
+                    <div>
+                        <h2 class="h4 mb-3 pb-2 border-bottom">Trusted Contacts</h2>
+                        <p class="text-muted mb-3">
+                            <i class="fas fa-info-circle"></i>
+                            These contacts will be notified when you trigger an SOS alert.
+                        </p>
+
+                        <button class="btn btn-hero mb-3" onclick="toggleAddForm()">
+                            <i class="fas fa-plus"></i> Add Trusted Contact
+                        </button>
+
+                        <!-- Add Contact Form -->
+                        <div class="card bg-light border d-none mb-3" id="addContactForm">
+                            <div class="card-body">
+                                <h3 class="h5 mb-3">Add New Contact</h3>
+                                <form id="contactForm">
+                                    <div class="mb-3">
+                                        <label for="contactName" class="form-label fw-bold">Name *</label>
+                                        <input type="text" class="form-control" id="contactName" required
+                                            placeholder="Enter contact name">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="contactEmail" class="form-label fw-bold">Email *</label>
+                                        <input type="email" class="form-control" id="contactEmail" required
+                                            placeholder="example@email.com">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="contactPhone" class="form-label fw-bold">Phone Number</label>
+                                        <input type="tel" class="form-control" id="contactPhone"
+                                            placeholder="+880 1234567890">
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <button type="submit" class="btn btn-hero">
+                                            <i class="fas fa-check"></i> Add Contact
+                                        </button>
+                                        <button type="button" class="btn btn-secondary" onclick="toggleAddForm()">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- Contacts List -->
+                        <div id="contactsList">
+                            {% if user.trusted_contacts %}
+                            {% for contact in user.trusted_contacts %}
+                            <div class="card mb-3 shadow-sm" data-contact-id="{{ contact.id }}">
+                                <div class="card-body d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h3 class="h5 mb-2">{{ contact.name }}</h3>
+                                        <div class="text-muted">
+                                            {% if contact.email %}
+                                            <div class="mb-1">
+                                                <i class="fas fa-envelope"></i> {{ contact.email }}
+                                            </div>
+                                            {% endif %}
+                                            {% if contact.phone %}
+                                            <div>
+                                                <i class="fas fa-phone"></i> {{ contact.phone }}
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-danger btn-sm" onclick="removeContact('{{ contact.id }}')">
+
+                                        <i class="fas fa-trash"></i> Remove
+                                    </button>
+                                </div>
+                            </div>
+                            {% endfor %}
+                            {% else %}
+                            <div class="text-center py-5 text-muted">
+                                <i class="fas fa-users mb-3" style="font-size: 3rem;"></i>
+                                <p class="mb-1">No trusted contacts added yet.</p>
+                                <p class="small">Add contacts who should be notified in emergencies.</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    function toggleAddForm() {
+        const form = document.getElementById('addContactForm');
+        form.classList.toggle('d-none');
+        if (form.classList.contains('d-none')) {
+            document.getElementById('contactForm').reset();
+        }
+    }
+
+    function showMessage(message, isError = false) {
+        const errorEl = document.getElementById('errorMessage');
+        const successEl = document.getElementById('successMessage');
+
+        if (isError) {
+            errorEl.textContent = message;
+            errorEl.classList.remove('d-none');
+            successEl.classList.add('d-none');
+        } else {
+            successEl.textContent = message;
+            successEl.classList.remove('d-none');
+            errorEl.classList.add('d-none');
+        }
+
+        setTimeout(() => {
+            errorEl.classList.add('d-none');
+            successEl.classList.add('d-none');
+        }, 5000);
+    }
+
+    document.getElementById('contactForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const name = document.getElementById('contactName').value;
+        const email = document.getElementById('contactEmail').value;
+        const phone = document.getElementById('contactPhone').value;
+
+        try {
+            const response = await fetch('/add_trusted_contact', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ name, email, phone })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                showMessage('Trusted contact added successfully!');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showMessage(data.error || 'Failed to add contact', true);
+            }
+        } catch (error) {
+            showMessage('Error adding contact: ' + error.message, true);
+        }
+    });
+
+    async function removeContact(contactId) {
+        if (!confirm('Are you sure you want to remove this trusted contact?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/remove_trusted_contact', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ contact_id: contactId })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                showMessage('Trusted contact removed successfully!');
+                document.querySelector(`[data-contact-id="${contactId}"]`).remove();
+
+                const contactsList = document.querySelectorAll('[data-contact-id]');
+                if (contactsList.length === 0) {
+                    location.reload();
+                }
+            } else {
+                showMessage(data.error || 'Failed to remove contact', true);
+            }
+        } catch (error) {
+            showMessage('Error removing contact: ' + error.message, true);
+        }
+    }
+</script>
+{% endblock %}
