@@ -45,5 +45,38 @@
                 }
             }
         }
+    },
+    "Shyamali": {
+        "password": "bye",
+        "email": "shyamalidas285@gmail.com",
+        "created_at": "2025-11-04T22:56:40.138483",
+        "verified": true,
+        "trusted_contacts": [
+            {
+                "id": 1,
+                "name": "Shyamali Das",
+                "relation": "Sister",
+                "email": "2022331033@student.sust.edu",
+                "phone": null,
+                "preferred_channel": "email",
+                "notify_scope": "sos_only",
+                "confirmed": false
+            }
+        ],
+        "profile": {
+            "full_name": "Shyamali Das",
+            "phone": "01765374049",
+            "country": "BD",
+            "city": "Sylhet",
+            "language": "Engli",
+            "timezone": "UTC",
+            "consents": {
+                "privacy": true,
+                "communication": {
+                    "transactional": true,
+                    "promotional": false
+                }
+            }
+        }
     }
 }

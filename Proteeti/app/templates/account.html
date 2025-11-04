@@ -204,4 +204,72 @@
         }
     }
 </script>
+
+<!-- --- Core Information (Required) --- -->
+<h3 class="h5 my-4">Core Details</h3>
+<ul class="list-group mb-3">
+  <li class="list-group-item"><strong>Full name:</strong> {{ user.profile.full_name or '' }}</li>
+  <li class="list-group-item"><strong>Mobile phone:</strong> {{ user.profile.phone or '' }}</li>
+  <li class="list-group-item"><strong>Country:</strong> {{ user.profile.country or '' }}</li>
+  <li class="list-group-item"><strong>City:</strong> {{ user.profile.city or '' }}</li>
+  <li class="list-group-item"><strong>Primary language:</strong> {{ user.profile.language or '' }}</li>
+  <li class="list-group-item"><strong>Timezone:</strong> {{ user.profile.timezone or '' }}</li>
+</ul>
+
+<!-- --- Trusted Contacts (At least one required) --- -->
+<h3 class="h5 my-4">Trusted Contacts</h3>
+<ul class="list-group mb-3">
+  {% if user.trusted_contacts %}
+    {% for c in user.trusted_contacts %}
+      <li class="list-group-item">
+        <strong>Name:</strong> {{ c.name }}<br>
+        <strong>Relation:</strong> {{ c.relation or '' }}<br>
+        <strong>Email:</strong> {{ c.email or '' }}<br>
+        <strong>Phone:</strong> {{ c.phone or '' }}<br>
+        <strong>Preferred channel:</strong> {{ c.channel or '' }}<br>
+        <strong>Notify on:</strong> {{ c.notify_on or 'SOS only' }}
+      </li>
+    {% endfor %}
+  {% else %}
+    <li class="list-group-item text-muted">No trusted contacts added yet.</li>
+  {% endif %}
+</ul>
+
+<!-- --- Consent & Preferences (Required) --- -->
+<h3 class="h5 my-4">Consent & Preferences</h3>
+<ul class="list-group mb-3">
+  <li class="list-group-item"><strong>Location permission:</strong> {% if user.profile.location_permission %}✔ Allowed{% else %}✘ Not allowed{% endif %}</li>
+  <li class="list-group-item"><strong>Privacy consent:</strong> <a href="/privacy-policy" target="_blank">See privacy policy</a></li>
+  <li class="list-group-item"><strong>Communication consent:</strong> {{ user.profile.comms_consent or 'Transactional only' }}</li>
+</ul>
+
+<!-- --- Optional & Recommended --- -->
+<h3 class="h5 my-4">Extra (Recommended)</h3>
+<ul class="list-group mb-3">
+  <li class="list-group-item"><strong>Secondary phone:</strong> {{ user.profile.secondary_phone or '-' }}</li>
+  <li class="list-group-item"><strong>Home area:</strong> {{ user.profile.home_area or '-' }}</li>
+  <li class="list-group-item"><strong>Medical notes:</strong> {{ user.profile.medical_notes or '-' }}</li>
+  <li class="list-group-item"><strong>Emergency instructions:</strong> {{ user.profile.emergency_instructions or '-' }}</li>
+</ul>
+
+<!-- --- Nice to Have --- -->
+<h3 class="h5 my-4">Nice to Have</h3>
+<ul class="list-group mb-3">
+  <li class="list-group-item"><strong>Avatar/photo:</strong>
+    {% if user.profile.avatar %}
+      <img src="{{ user.profile.avatar }}" alt="avatar" width="50">
+    {% else %}-{% endif %}
+  </li>
+  <li class="list-group-item"><strong>Gender:</strong> {{ user.profile.gender or '-' }}</li>
+  <li class="list-group-item"><strong>DOB:</strong> {{ user.profile.dob or '-' }}</li>
+  <li class="list-group-item"><strong>Device push token:</strong> {{ user.profile.push_token or '-' }}</li>
+</ul>
+
+<div class="text-end">
+  <a href="{{ url_for('edit_profile') }}" class="btn btn-primary">
+    <i class="fas fa-edit"></i> Edit Profile
+  </a>
+</div>
+
+
 {% endblock %}

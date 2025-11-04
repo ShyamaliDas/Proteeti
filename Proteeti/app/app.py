@@ -5,33 +5,30 @@ from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
-import base64
-import json as _json
+
+from config.database import Config
+from models.user import db, User, Report
+
 load_dotenv()
 
-# DEV_MODE toggles development behavior (skip sending real emails, show verification codes)
 DEV_MODE = os.getenv("DEV_MODE", "False").lower() in ("1", "true", "yes")
-
 os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
-app.secret_key = os.getenv("SECRET_KEY", "proteeti_secret_key_2025")
+app.config.from_object(Config)
 
-# ======= Config / Paths =======
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "data")
-USERS_FILE = os.path.join(DATA_DIR, "users.json")
-REPORTS_FILE = os.path.join(DATA_DIR, "reports.json")
-os.makedirs(DATA_DIR, exist_ok=True)
+# Initialize database
+db.init_app(app)
+
+# Create tables on first run
+with app.app_context():
+    db.create_all()
 
 # ======= Google OAuth =======
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
 
 if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
-    app.config["GOOGLE_OAUTH_CLIENT_ID"] = GOOGLE_CLIENT_ID
-    app.config["GOOGLE_OAUTH_CLIENT_SECRET"] = GOOGLE_CLIENT_SECRET
-    
     google_bp = make_google_blueprint(
         client_id=GOOGLE_CLIENT_ID,
         client_secret=GOOGLE_CLIENT_SECRET,
@@ -44,58 +41,7 @@ if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
     )
     app.register_blueprint(google_bp, url_prefix="/login")
 else:
-    print("WARNING: Google OAuth credentials not found. Google login will not work.")
-
-# ======= Storage utils =======
-def init_json_files():
-    if not os.path.exists(USERS_FILE):
-        with open(USERS_FILE, "w") as f:
-            json.dump({}, f)
-    if not os.path.exists(REPORTS_FILE):
-        with open(REPORTS_FILE, "w") as f:
-            json.dump([], f)
-
-def load_users():
-    try:
-        with open(USERS_FILE, "r") as f:
-            return json.load(f)
-    except:
-        return {}
-
-def save_user_record(username, email, password, verified=True):
-    print("Saving users to:", os.path.abspath(USERS_FILE))
-    users = load_users()
-    
-    existing_contacts = []
-    if username in users:
-        existing_contacts = users[username].get("trusted_contacts", [])
-    
-    users[username] = {
-        "password": password,
-        "email": email,
-        "created_at": users.get(username, {}).get("created_at", datetime.now().isoformat()),
-        "verified": verified,
-        "trusted_contacts": existing_contacts
-    }
-    with open(USERS_FILE, "w") as f:
-        json.dump(users, f, indent=4)
-    print("Saved user:", username)
-
-def email_in_use(email):
-    return any(u.get("email") == email for u in load_users().values())
-
-def load_reports():
-    try:
-        if os.path.exists(REPORTS_FILE):
-            with open(REPORTS_FILE, "r") as f:
-                return json.load(f)
-    except:
-        pass
-    return []
-
-def save_reports(reports):
-    with open(REPORTS_FILE, "w") as f:
-        json.dump(reports, f, indent=4)
+    print("WARNING: Google OAuth credentials not found.")
 
 # ======= Email validation =======
 def is_valid_email(email):
@@ -104,7 +50,6 @@ def is_valid_email(email):
 MAILBOXLAYER_KEY = os.getenv("MAILBOXLAYER_KEY")
 
 def mailboxlayer_check(email):
-    """Skip remote email validation in DEV to avoid slow requests."""
     if DEV_MODE or not MAILBOXLAYER_KEY:
         return True, "Email validation skipped in dev mode"
     url = f"http://apilayer.net/api/check?access_key={MAILBOXLAYER_KEY}&email={email}&smtp=1&format=1"
@@ -118,24 +63,20 @@ def mailboxlayer_check(email):
         if data.get("disposable", False): return False, "Disposable/temporary email addresses are not allowed."
         return True, "Email is valid."
     except Exception:
-        # don't block registration if the API is slow/unreachable
         return True, "Email validation skipped"
+
 
 # ======= 6-digit code =======
 def generate_verification_code():
     return str(random.randint(100000, 999999))
 
+
+
 GMAIL_SENDER = os.getenv("GMAIL_SENDER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 
 def send_verification_code(email, code):
-    """
-    Non-blocking-ish email sender:
-    - DEV_MODE: do not send, return immediately.
-    - No creds: return immediately.
-    - SMTP connection timeout enforced (8s) so UI won't hang.
-    - Failures are swallowed; OTP is still displayed in DEV via 'show_code'.
-    """
+
     if DEV_MODE:
         return True
     if not GMAIL_SENDER or not GMAIL_APP_PASSWORD:
@@ -162,6 +103,8 @@ def send_verification_code(email, code):
             pass
         return False
 
+
+
 # ======= Routes =======
 @app.route("/")
 def index():
@@ -173,24 +116,22 @@ def login():
     if request.method == "POST":
         username_or_email = request.form["username_or_email"].strip()
         password = request.form["password"]
-
+        
         if "@" in username_or_email and not is_valid_email(username_or_email):
             error = "Please enter a valid email address."
             return render_template("login.html", error=error)
-
-        users = load_users()
-        found = None
-        for uname, info in users.items():
-            if username_or_email == uname or username_or_email == info.get("email"):
-                found = {"username": uname, "password": info.get("password")}
-                break
-
-        if found and password == found["password"]:
+        
+        # Query database instead of JSON
+        user = User.query.filter(
+            (User.username == username_or_email) | (User.email == username_or_email)
+        ).first()
+        
+        if user and user.check_password(password):
             session.clear()
             session["loggedin"] = True
-            session["username"] = found["username"]
+            session["username"] = user.username
             session.modified = True
-            print(f"Login successful for {found['username']}")
+            print(f"Login successful for {user.username}")
             return redirect(url_for("index"))
         else:
             error = "Invalid username/email or password."
@@ -205,33 +146,31 @@ def register():
         email = request.form["email"].strip()
         password = request.form["password"]
         confirmpassword = request.form.get("confirmpassword", "")
-
+        
         if not username or not email or not password:
             error = "Username, email and password are required."
             return render_template("register.html", error=error)
-
+        
         if not is_valid_email(email):
             error = "Please enter a valid email address."
             return render_template("register.html", error=error)
-
-        ok, msg = mailboxlayer_check(email)
-        if not ok:
-            error = msg
-            return render_template("register.html", error=error)
-
+        
         if password != confirmpassword:
             error = "Passwords do not match."
             return render_template("register.html", error=error)
-
-        users = load_users()
-        if username in users or email_in_use(email):
-            error = "Username or email already exists."
+        
+        # Check if user exists in database
+        if User.query.filter_by(username=username).first():
+            error = "Username already exists."
             return render_template("register.html", error=error)
-
+        
+        if User.query.filter_by(email=email).first():
+            error = "Email already in use."
+            return render_template("register.html", error=error)
+        
         code = generate_verification_code()
-        # Do not block UI on email sending; failures are fine in DEV/test.
-        _ = send_verification_code(email, code)
-
+        send_verification_code(email, code)
+        
         session["pending_user"] = {
             "flow": "manual",
             "username": username,
@@ -240,103 +179,40 @@ def register():
             "code": code,
             "created_at": datetime.now().isoformat(),
         }
+        
         return redirect(url_for("verify_email"))
     
     return render_template("register.html", error=error)
-
-@app.route("/login/google/authorized")
-def google_authorized():
-    print("=== Google OAuth Callback ===")
-    print("Request URL:", request.url)
-    
-    if not google.authorized:
-        print("Not authorized, redirecting to login")
-        return redirect(url_for("login"))
-
-    try:
-        resp = google.get("/oauth2/v2/userinfo")
-        if not resp.ok:
-            print(f"Failed to get user info: {resp.text}")
-            return redirect(url_for("login"))
-        
-        userinfo = resp.json()
-        print("User info:", userinfo)
-        
-        google_sub = userinfo.get("sub")
-        email = userinfo.get("email")
-        name = userinfo.get("name", email.split("@")[0])
-
-        # Check if user already exists
-        users = load_users()
-        existing_user = None
-        for uname, info in users.items():
-            if info.get("email") == email:
-                existing_user = uname
-                break
-
-        if existing_user:
-            # User exists, log them in directly
-            session.clear()
-            session["loggedin"] = True
-            session["username"] = existing_user
-            session.modified = True
-            print(f"Existing user logged in: {existing_user}")
-            return redirect(url_for("account"))
-        
-        # New user - send verification code
-        code = generate_verification_code()
-        try:
-            send_verification_code(email, code)
-        except Exception as e:
-            print(f"Email send error: {e}")
-            # Continue anyway in dev mode
-            if not DEV_MODE:
-                return render_template("login.html", error=f"Could not initiate verification: {e}")
-
-        session["pending_user"] = {
-            "flow": "google",
-            "username": f"google_{google_sub}",
-            "email": email,
-            "password": None,
-            "name": name,
-            "code": code,
-            "created_at": datetime.now().isoformat(),
-        }
-        return redirect(url_for("verify_email"))
-    
-    except Exception as e:
-        print(f"Error in google_authorized: {e}")
-        return redirect(url_for("login"))
 
 @app.route("/verify-email", methods=["GET", "POST"])
 def verify_email():
     error = None
     pending = session.get("pending_user")
-    print("Pending user in session:", pending)
     
     if not pending:
         return redirect(url_for("register"))
-
+    
     show_code = DEV_MODE
-
+    
     if request.method == "POST":
         entered_code = request.form["code"].strip()
-        print("Entered:", entered_code, "Expected:", pending["code"])
         
         if entered_code == pending["code"]:
-            save_user_record(
-                pending["username"],
-                pending["email"],
-                pending["password"],
+            # Create user in database
+            user = User(
+                username=pending["username"],
+                email=pending["email"],
                 verified=True
             )
+            user.set_password(pending["password"])
+            
+            db.session.add(user)
+            db.session.commit()
             
             session.clear()
             session["loggedin"] = True
-            session["username"] = pending["username"]
+            session["username"] = user.username
             session.modified = True
-            
-            print("Session set - loggedin:", session.get("loggedin"), "username:", session.get("username"))
             
             return redirect(url_for("onboarding"))
         else:
@@ -344,198 +220,71 @@ def verify_email():
     
     return render_template("verify_email.html", error=error, show_code=show_code, code=(pending["code"] if show_code else None))
 
-# ---------- /account: render dashboard with full user info ----------
 @app.route("/account")
 def account():
     if not session.get("loggedin"):
         return redirect(url_for("login"))
-
+    
     username = session.get("username")
-    users = load_users()
-    info = users.get(username)
-
-    if not info:
-        # user record missing → logout for safety
+    user = User.query.filter_by(username=username).first()
+    
+    if not user:
         return redirect(url_for("logout"))
-
-    # Ensure sane defaults so templates don't crash
-    info.setdefault("profile", {})
-    info.setdefault("trusted_contacts", [])
+    
+    # Convert to dict format like JSON
+    info = user.to_dict()
     info.setdefault("notification_prefs", {
         "channels": {"email": True, "sms": True, "push": False},
         "quiet_hours": {"start": "22:00", "end": "07:00"},
         "hazard_categories": []
     })
-
+    
     return render_template("account.html", user=info, username=username)
 
-
-# ---------- /update_account: accept JSON and persist ----------
 @app.route("/update_account", methods=["POST"])
 def update_account():
     if not session.get("loggedin"):
         return jsonify({"error": "Please login first"}), 401
-
+    
     username = session.get("username")
-    users = load_users()
-    info = users.get(username, {})
-
-    # Always have containers
-    info.setdefault("profile", {})
-    info.setdefault("notification_prefs", {})
-
+    user = User.query.filter_by(username=username).first()
+    
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
     try:
         data = request.get_json(force=True, silent=True) or {}
-
-        # A) Core
+        
+        # Update profile
+        if not user.profile:
+            user.profile = {}
+        
         core = data.get("core") or {}
         for k in ("full_name", "phone", "country", "city", "language", "timezone"):
             if k in core:
-                v = core.get(k) or ""
-                info["profile"][k] = v.strip() if isinstance(v, str) else v
-
-        # C) Consents & preferences
+                user.profile[k] = core[k]
+        
+        # Update consents
         cons = data.get("consents")
         if cons is not None:
-            # expected: {'location': bool, 'privacy': bool, 'communication': {'transactional': bool, 'promotional': bool}}
-            info["profile"]["consents"] = {
-                "location": bool(cons.get("location", False)),
-                "privacy": bool(cons.get("privacy", True)),
-                "communication": {
-                    "transactional": bool((cons.get("communication") or {}).get("transactional", True)),
-                    "promotional": bool((cons.get("communication") or {}).get("promotional", False)),
-                }
-            }
-
+            user.profile["consents"] = cons
+        
+        # Update notification preferences
         notif = data.get("notification_prefs")
         if notif is not None:
-            # expected keys exist or we default them
-            channels = (notif.get("channels") or {})
-            quiet = (notif.get("quiet_hours") or {})
-            info["notification_prefs"] = {
-                "channels": {
-                    "email": bool(channels.get("email", True)),
-                    "sms": bool(channels.get("sms", True)),
-                    "push": bool(channels.get("push", False)),
-                },
-                "quiet_hours": {
-                    "start": str(quiet.get("start", "22:00")),
-                    "end": str(quiet.get("end", "07:00")),
-                },
-                "hazard_categories": list(notif.get("hazard_categories") or [])
-            }
-
-        # D/E) Optional
+            user.notification_prefs = notif
+        
+        # Update optional fields
         optional = data.get("optional") or {}
-        if optional:
-            for k in ("secondary_phone", "medical_notes", "emergency_instructions",
-                      "avatar_url", "gender", "dob", "device_push_token"):
-                if k in optional:
-                    info["profile"][k] = optional.get(k)
-            if "home_area" in optional:
-                # expected: {'lat': float, 'lng': float, 'radius_m': int}
-                ha = optional.get("home_area") or {}
-                lat = ha.get("lat"); lng = ha.get("lng"); r = ha.get("radius_m")
-                # store only if at least lat/lng present
-                if lat is not None and lng is not None:
-                    info["profile"]["home_area"] = {
-                        "lat": float(lat),
-                        "lng": float(lng),
-                        "radius_m": int(r) if r is not None else 1500
-                    }
-
-        # Persist
-        users[username] = info
-        with open(USERS_FILE, "w") as f:
-            json.dump(users, f, indent=4)
-
+        for k, v in optional.items():
+            user.profile[k] = v
+        
+        db.session.commit()
         return jsonify({"message": "Account updated"}), 200
-
+    
     except Exception as e:
-        try:
-            app.logger.error(f"/update_account error: {e}")
-        except Exception:
-            pass
+        db.session.rollback()
         return jsonify({"error": "Unable to update account"}), 400
-
-@app.route("/onboarding", methods=["GET", "POST"])
-def onboarding():
-    if not session.get("loggedin"):
-        return redirect(url_for("login"))
-
-    username = session.get("username")
-    users = load_users()
-    info = users.get(username, {}) or {}
-
-    # existing values (for prefill)
-    profile = info.get("profile", {})
-    full_name  = profile.get("full_name", "")
-    phone      = profile.get("phone", "")
-    country    = profile.get("country", "")
-    city       = profile.get("city", "")
-    language   = profile.get("language", "en")
-    timezone   = profile.get("timezone", "UTC")
-
-    error = None
-
-    if request.method == "POST":
-        full_name = (request.form.get("full_name") or "").strip()
-        phone     = (request.form.get("phone") or "").strip()
-        country   = (request.form.get("country") or "").strip().upper()
-        city      = (request.form.get("city") or "").strip()
-        language  = (request.form.get("language") or "en").strip()
-        timezone  = (request.form.get("timezone") or "UTC").strip()
-
-        tc_name     = (request.form.get("tc_name") or "").strip()
-        tc_relation = (request.form.get("tc_relation") or "").strip()
-        tc_reach    = (request.form.get("tc_reach") or "").strip()
-        tc_channel  = (request.form.get("tc_channel") or "sms").strip()
-
-        # minimal validation (why: ensure alerts can reach someone)
-        required = [full_name, phone, country, city, language, timezone, tc_name, tc_relation, tc_reach]
-        if not all(required):
-            error = "Please complete all required fields."
-        else:
-            # merge profile
-            info.setdefault("profile", {})
-            info["profile"].update({
-                "full_name": full_name,
-                "phone": phone,
-                "country": country,
-                "city": city,
-                "language": language,
-                "timezone": timezone,
-                "consents": {"privacy": True, "communication": {"transactional": True, "promotional": False}}
-            })
-            # trusted contact list ensure + append one
-            info.setdefault("trusted_contacts", [])
-            next_id = (max([c.get("id", 0) for c in info["trusted_contacts"]], default=0) + 1)
-            info["trusted_contacts"].append({
-                "id": next_id,
-                "name": tc_name,
-                "relation": tc_relation,
-                "email": (tc_reach if "@" in tc_reach else None),
-                "phone": (tc_reach if "@" not in tc_reach else None),
-                "preferred_channel": tc_channel,
-                "notify_scope": "sos_only",
-                "confirmed": False
-            })
-
-            # persist
-            users[username] = info
-            with open(USERS_FILE, "w") as f:
-                json.dump(users, f, indent=4)
-
-            # end onboarding: sign-out to force clean login
-            session.clear()
-            return redirect(url_for("login"))
-
-    return render_template(
-        "onboarding.html",
-        error=error,
-        full_name=full_name, phone=phone, country=country, city=city,
-        language=language, timezone=timezone
-    )
 
 @app.route("/add_trusted_contact", methods=["POST"])
 def add_trusted_contact():
@@ -544,40 +293,28 @@ def add_trusted_contact():
     
     try:
         data = request.get_json()
-        contact_name = data.get("name", "").strip()
-        contact_email = data.get("email", "").strip()
-        contact_phone = data.get("phone", "").strip()
-        
-        if not contact_name or not contact_email:
-            return jsonify({"error": "Name and email are required"}), 400
-        
-        if not is_valid_email(contact_email):
-            return jsonify({"error": "Please enter a valid email address"}), 400
-        
         username = session.get("username")
-        users = load_users()
+        user = User.query.filter_by(username=username).first()
         
-        if "trusted_contacts" not in users[username]:
-            users[username]["trusted_contacts"] = []
+        if not user.trusted_contacts:
+            user.trusted_contacts = []
         
         new_contact = {
-            "id": len(users[username]["trusted_contacts"]) + 1,
-            "name": contact_name,
-            "email": contact_email,
-            "phone": contact_phone
+            "id": len(user.trusted_contacts) + 1,
+            "name": data.get("name"),
+            "email": data.get("email"),
+            "phone": data.get("phone")
         }
-        users[username]["trusted_contacts"].append(new_contact)
         
-        with open(USERS_FILE, "w") as f:
-            json.dump(users, f, indent=4)
+        user.trusted_contacts.append(new_contact)
+        db.session.commit()
         
-        return jsonify({
-            "message": "Trusted contact added successfully",
-            "contact": new_contact
-        }), 200
-        
+        return jsonify({"message": "Trusted contact added successfully", "contact": new_contact}), 200
+    
     except Exception as e:
+        db.session.rollback()
         return jsonify({"error": str(e)}), 500
+    
 
 @app.route("/remove_trusted_contact", methods=["POST"])
 def remove_trusted_contact():
@@ -593,26 +330,112 @@ def remove_trusted_contact():
         
         contact_id = int(contact_id)
         username = session.get("username")
-        users = load_users()
+        user = User.query.filter_by(username=username).first()
         
-        if "trusted_contacts" in users[username]:
-            users[username]["trusted_contacts"] = [
-                c for c in users[username]["trusted_contacts"] 
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        
+        # Remove contact from database
+        if user.trusted_contacts:
+            user.trusted_contacts = [
+                c for c in user.trusted_contacts
                 if c.get("id") != contact_id
             ]
         
-        with open(USERS_FILE, "w") as f:
-            json.dump(users, f, indent=4)
+        db.session.commit()
         
-        return jsonify({"message": "Trusted contact removed successfully"}), 200
+        return jsonify({
+            "message": "Trusted contact removed successfully",
+            "status": "ok"
+        }), 200
         
     except Exception as e:
+        db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect(url_for("index"))
+
+@app.route('/profile', methods=['GET', 'POST'])  
+def profile():
+    if not session.get("loggedin"):
+        return redirect(url_for("login"))
+    
+    username = session.get("username")
+    user = User.query.filter_by(username=username).first()
+    
+    if request.method == "POST":
+        core = request.form or request.get_json(silent=True) or {}
+        for k in ("full_name", "phone", "country", "city", "language", "timezone"):
+            if k in core:
+                if not user.profile:
+                    user.profile = {}
+                user.profile[k] = core[k]
+        db.session.commit()
+        return jsonify({"message": "Profile updated"}), 200
+    
+    return render_template("profile.html", user=user.to_dict(), username=username)
+
+
+    
+@app.route('/onboarding', methods=['GET', 'POST'])
+def onboarding():
+    if not session.get("loggedin"):
+        return redirect(url_for("login"))
+    username = session.get("username")
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return redirect(url_for("logout"))
+
+    if request.method == "POST":
+        # Accept either form data or JSON
+        data = request.form or request.get_json(silent=True) or {}
+        for key in ["full_name", "phone", "country", "city", "language", "timezone", "other_optional_fields"]:
+            value = data.get(key)
+            if value is not None:
+                # Create profile dict if needed
+                if not user.profile:
+                    user.profile = {}
+                user.profile[key] = value
+        db.session.commit()  
+        return redirect(url_for("index"))  
+    return render_template("onboarding.html", username=username)
+
+
+@app.route('/edit-profile', methods=['GET', 'POST'])
+def edit_profile():
+    if not session.get("loggedin"):
+        return redirect(url_for("login"))
+    username = session.get("username")
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return redirect(url_for("logout"))
+
+    profile_fields = [
+        "full_name", "phone", "country", "city", "language", "timezone",
+        "location_permission", "comms_consent", "secondary_phone",
+        "home_area", "medical_notes", "emergency_instructions",
+        "avatar", "gender", "dob", "push_token"
+    ]
+
+    if request.method == "POST":
+        form = request.form
+        # Use a copy for safety
+        profile = dict(user.profile) if user.profile else {}
+        for key in profile_fields:
+            if key == "location_permission":
+                # Checkbox: only present if checked
+                profile[key] = form.get(key) == "on"
+            else:
+                value = form.get(key)
+                if value is not None:
+                    profile[key] = value
+        user.profile = profile
+        db.session.commit()
+        return redirect(url_for("account"))
+    return render_template("edit_profile.html", user=user)
+
+
+
+
 
 @app.route("/sos")
 def sos():
@@ -620,7 +443,7 @@ def sos():
 
 @app.route("/map")
 def show_map():
-    reports = load_reports()
+    reports = Report.query.all() 
     return render_template("map.html", reports=reports)
 
 @app.route("/resources")
@@ -637,51 +460,49 @@ def send_sos():
         sos_data = request.get_json()
         print("Received SOS from", session.get("username"), sos_data)
         
-        # Here you would send emails/SMS to trusted contacts
-        # For now, just log it
+        
         
         return jsonify({"message": "SOS alert sent successfully", "status": "ok"}), 200
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e)}), 500    
+
 
 @app.route("/submit_report", methods=["POST"])
 def submit_report():
+    if not session.get("loggedin"):
+        return jsonify({"error": "Please login first"}), 401
+    
     try:
-        if not session.get("loggedin"):
-            return jsonify({"error": "Please login first"}), 401
-        
         report_data = request.get_json()
-        reports = load_reports()
         
-        new_report = {
-            "id": len(reports) + 1,
-            "username": session.get("username"),
-            "lat": report_data.get("lat"),
-            "lng": report_data.get("lng"),
-            "category": report_data.get("category"),
-            "description": report_data.get("description", ""),
-            "timestamp": datetime.now().isoformat(),
-        }
-        reports.append(new_report)
-        save_reports(reports)
+        report = Report(
+            username=session.get("username"),
+            lat=report_data.get("lat"),
+            lng=report_data.get("lng"),
+            category=report_data.get("category"),
+            description=report_data.get("description", "")
+        )
         
-        return jsonify({
-            "message": "Report submitted successfully", 
-            "status": "ok", 
-            "report_id": new_report["id"]
-        }), 200
+        db.session.add(report)
+        db.session.commit()
         
+        return jsonify({"message": "Report submitted successfully", "status": "ok", "report_id": report.id}), 200
+    
     except Exception as e:
+        db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/reports")
 def get_reports_api():
-    reports = load_reports()
-    return jsonify(reports)
+    reports = Report.query.all()
+    return jsonify([r.to_dict() for r in reports])
 
-# Initialize data files
-init_json_files()
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("index"))
 
-# ======= Boot =======
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
