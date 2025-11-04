@@ -1,0 +1,92 @@
+# =========================
+# templates/onboarding.html  (create this file)
+# =========================
+{% extends "base.html" %}
+{% block content %}
+<div class="auth-split-container">
+  <div class="auth-card-wrapper">
+    <div class="row g-0">
+      <!-- Art / Illustration (LEFT) -->
+      <div class="col-lg-6 d-none d-lg-block login-art-panel position-relative">
+        <span class="auth-bubble big" style="left:12%;top:18%"></span>
+        <span class="auth-bubble med" style="left:22%;top:50%"></span>
+        <span class="auth-bubble sm"  style="left:8%; top:72%"></span>
+      </div>
+
+      <!-- Form (RIGHT) -->
+      <div class="col-12 col-lg-6 bg-transparent auth-form-col">
+        <div class="login-form-blob w-100">
+          <div class="auth-card-inner">
+            <h1 class="mb-1" style="color:var(--bordeaux);font-weight:700;">Complete your profile</h1>
+            <p class="text-muted mb-3">Just a few details to personalize alerts and contacts.</p>
+
+            {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+
+            <form method="post" novalidate>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">Full name</label>
+                  <input class="form-control" name="full_name" value="{{ full_name or '' }}" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Mobile phone</label>
+                  <input class="form-control" name="phone" placeholder="+8801..." value="{{ phone or '' }}" required>
+                </div>
+
+                <div class="col-md-4">
+                  <label class="form-label">Country</label>
+                  <input class="form-control" name="country" placeholder="BD" maxlength="2" value="{{ country or '' }}" required>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">City</label>
+                  <input class="form-control" name="city" value="{{ city or '' }}" required>
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label">Language</label>
+                  <input class="form-control" name="language" placeholder="en" maxlength="5" value="{{ language or 'en' }}" required>
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label">Timezone</label>
+                  <input class="form-control" name="timezone" placeholder="Asia/Dhaka" value="{{ timezone or 'UTC' }}" required>
+                </div>
+
+                <div class="col-12"><hr></div>
+
+                <div class="col-12">
+                  <h5 class="mb-2">Trusted contact (required)</h5>
+                </div>
+                <div class="col-md-5">
+                  <label class="form-label">Name</label>
+                  <input class="form-control" name="tc_name" required>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Relation</label>
+                  <input class="form-control" name="tc_relation" required>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Email or Phone</label>
+                  <input class="form-control" name="tc_reach" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Preferred channel</label>
+                  <select class="form-select" name="tc_channel">
+                    <option value="sms">SMS</option>
+                    <option value="email">Email</option>
+                    <option value="call">Call</option>
+                  </select>
+                </div>
+
+                <div class="col-12 mt-2">
+                  <button class="btn btn-danger w-100 btn-lg">Save & Continue to Login</button>
+                </div>
+              </div>
+            </form>
+
+            <p class="text-center text-muted small mb-0 mt-2">You can edit these later in Account → Profile & Contacts.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

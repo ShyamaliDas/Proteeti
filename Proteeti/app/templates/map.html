@@ -1,6 +1,10 @@
+<!-- =========================
+templates/map.html
+(only login check line changed; UI untouched)
+========================= -->
 {% extends "base.html" %}
 {% block content %}
-<div class="container">
+<div class="container" id="mapContainer" data-loggedin="{{ session.get('loggedin')|tojson }}">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 class="mb-0">Community Safety Map</h2>
         <div>
@@ -50,21 +54,15 @@
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
-    // Initialize the map
     const map = L.map('map').setView([23.8103, 90.4125], 13);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
 
     let selectedMarker = null;
 
-    // Load existing reports from the server
     async function loadExistingReports() {
         try {
             const response = await fetch('/api/reports');
             const reports = await response.json();
-            
             reports.forEach(report => {
                 const marker = L.marker([report.lat, report.lng]).addTo(map);
                 marker.bindPopup(`
@@ -78,63 +76,43 @@
             console.log('No existing reports or error loading:', error);
         }
     }
-
-    // Load reports when page loads
     loadExistingReports();
 
-    // Handle map click to add a new marker for reporting
     map.on('click', function(e) {
-        // Check if user is logged in
-        const isLoggedIn = "{{ 'true' if session.get('logged_in') else 'false' }}";
+        // read logged-in state injected into HTML data attribute to avoid template syntax inside JS
+        const isLoggedIn = JSON.parse(document.getElementById('mapContainer').dataset.loggedin);
         if (!isLoggedIn) {
             alert('Please login first to report hazards');
             window.location.href = '/login';
             return;
         }
 
-        if (selectedMarker) {
-            map.removeLayer(selectedMarker);
-        }
+        if (selectedMarker) map.removeLayer(selectedMarker);
         selectedMarker = L.marker(e.latlng).addTo(map);
-        const reportModal = new bootstrap.Modal(document.getElementById('reportModal'));
-        reportModal.show();
+        new bootstrap.Modal(document.getElementById('reportModal')).show();
     });
 
-    // Handle report form submission
-    document.getElementById('reportForm').addEventListener('submit', async function(e) {
+    document.getElementById('reportForm')?.addEventListener('submit', async function(e) {
         e.preventDefault();
-        
-        if (!selectedMarker) {
-            alert('Please select a location on the map first');
-            return;
-        }
-        
+        if (!selectedMarker) { alert('Please select a location on the map first'); return; }
+
         const category = document.getElementById('reportCategory').value;
         const description = document.getElementById('reportDescription').value;
-        const lat = selectedMarker.getLatLng().lat;
-        const lng = selectedMarker.getLatLng().lng;
-        
+        const { lat, lng } = selectedMarker.getLatLng();
+
         try {
             const response = await fetch('/submit_report', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    lat: lat,
-                    lng: lng,
-                    category: category,
-                    description: description
-                })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lat, lng, category, description })
             });
-            
+
             const result = await response.json();
-            
+
             if (response.ok) {
                 alert('Report submitted successfully!');
-                bootstrap.Modal.getInstance(document.getElementById('reportModal')).hide();
-                
-                // Add the new report to the map immediately
+                bootstrap.Modal.getInstance(document.getElementById('reportModal'))?.hide();
+
                 const newMarker = L.marker([lat, lng]).addTo(map);
                 newMarker.bindPopup(`
                     <b>Category:</b> ${category}<br>
@@ -142,7 +120,7 @@
                     <b>Reported By:</b> {{ session.get('username', 'You') }}<br>
                     <b>Time:</b> Just now
                 `);
-                
+
                 map.removeLayer(selectedMarker);
                 selectedMarker = null;
             } else {
