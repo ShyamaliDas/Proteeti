@@ -3,7 +3,9 @@ from datetime import datetime
 import bcrypt
 import json
 
+
 db = SQLAlchemy()
+
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -11,7 +13,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
-    password_hash = db.Column(db.String(255), nullable=True)  # Null for Google OAuth users
+    password_hash = db.Column(db.String(255), nullable=True)  
     verified = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
@@ -52,6 +54,7 @@ class User(db.Model):
             'notification_prefs': self.notification_prefs or {}
         }
 
+
 class Report(db.Model):
     __tablename__ = 'reports'
     
@@ -75,3 +78,45 @@ class Report(db.Model):
             'description': self.description,
             'timestamp': self.timestamp.isoformat()
         }
+
+
+class SOSAlert(db.Model):
+    __tablename__ = 'sos_alerts'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    username = db.Column(db.String(80), nullable=False, index=True)
+    lat = db.Column(db.Float, nullable=False)
+    lng = db.Column(db.Float, nullable=False)
+    accuracy = db.Column(db.Float, nullable=True)
+    status = db.Column(db.String(20), default='active')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    
+    user = db.relationship('User', backref='sos_alerts')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'username': self.username,
+            'lat': self.lat,
+            'lng': self.lng,
+            'accuracy': self.accuracy,
+            'status': self.status,
+            'created_at': self.created_at.isoformat()
+        }
+
+
+
+class NotificationSubscription(db.Model):
+    __tablename__ = 'notification_subscriptions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    endpoint = db.Column(db.String(2000), unique=True, nullable=False)
+    auth_key = db.Column(db.String(255), nullable=False)
+    p256dh_key = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_active = db.Column(db.Boolean, default=True)
+
+    user = db.relationship('User', backref=db.backref('notification_subscriptions', lazy='dynamic', cascade='all, delete-orphan'))

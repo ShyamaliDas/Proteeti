@@ -1,6 +1,7 @@
 # app.py (top area)
 from flask import Flask
 import os
+from flask_cors import CORS
 
 # If templates/static are NOT in the same folder as app.py, point to them safely:
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -8,16 +9,24 @@ TEMPLATES_DIR = os.path.join(BASE_DIR, "..", "templates")   # adjust if needed
 STATIC_DIR    = os.path.join(BASE_DIR, "..", "static")      # adjust if needed
 
 app = Flask(__name__, template_folder=TEMPLATES_DIR, static_folder=STATIC_DIR)
+CORS(app)
 
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from flask_dance.contrib.google import make_google_blueprint, google
+from flask_migrate import Migrate
+from flask_login import login_required, current_user, LoginManager
+from flask import current_app
+from flask_sqlalchemy import SQLAlchemy
 import json, os, re, random, requests, smtplib
 from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
 from config.database import Config
-from models.user import db, User, Report
+from models.user import db, User, Report, SOSAlert, NotificationSubscription
+import base64
+import hashlib
+import hmac
 
 load_dotenv()
 
@@ -27,12 +36,16 @@ os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config.from_object(Config)
 
+
+
 # Initialize database
 db.init_app(app)
 
 # Create tables on first run
 with app.app_context():
     db.create_all()
+
+migrate = Migrate(app,db)
 
 # ======= Google OAuth =======
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
@@ -53,6 +66,14 @@ if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
 else:
     print("WARNING: Google OAuth credentials not found.")
 
+
+VAPID_PUBLIC_KEY = os.getenv('VAPID_PUBLIC_KEY', 'YOUR_PUBLIC_KEY')
+VAPID_PRIVATE_KEY = os.getenv('VAPID_PRIVATE_KEY', 'YOUR_PRIVATE_KEY')
+VAPID_EMAIL = os.getenv('VAPID_EMAIL', 'mailto:your-email@example.com')
+
+
+user_subscriptions = {}
+
 # ======= Email validation =======
 def is_valid_email(email):
     return re.fullmatch(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", email) is not None
@@ -64,7 +85,7 @@ def mailboxlayer_check(email):
         return True, "Email validation skipped in dev mode"
     url = f"http://apilayer.net/api/check?access_key={MAILBOXLAYER_KEY}&email={email}&smtp=1&format=1"
     try:
-        data = requests.get(url, timeout=8).json()  # 8s timeout to avoid page hang
+        data = requests.get(url, timeout=8).json()  
         if not data.get("success", True) and "error" in data:
             return True, "Email validation service unavailable, skipping"
         if not data.get("format_valid", False): return False, "Email format is invalid."
@@ -106,7 +127,6 @@ def send_verification_code(email, code):
         server.quit()
         return True
     except Exception as e:
-        # don't block the flow if email fails; log and continue
         try:
             app.logger.warning(f"Email send failed: {e}")
         except Exception:
@@ -115,10 +135,123 @@ def send_verification_code(email, code):
 
 
 
+def send_sos_email_with_location(user, latitude, longitude):
+    """Send immediate SOS email with live location (no attachment)"""
+    if not user.trusted_contacts:
+        print(f"[DEBUG] No trusted contacts found for {user.username}")
+        return False
+    
+    GMAIL_SENDER = os.getenv("GMAIL_SENDER")
+    GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
+    
+    if not GMAIL_SENDER or not GMAIL_APP_PASSWORD:
+        print("[DEBUG] Gmail credentials not configured!")
+        return False
+    
+    maps_link = f"https://www.google.com/maps?q={latitude},{longitude}"
+    
+    for contact in user.trusted_contacts:
+        try:
+            recipient_email = contact.get('email')
+            print(f"[DEBUG] Sending location SOS to {recipient_email}")
+            
+            msg = MIMEMultipart()
+            msg['From'] = f"Proteeti <{GMAIL_SENDER}>"
+            msg['To'] = recipient_email
+            msg['Subject'] = "🚨 EMERGENCY SOS ALERT - LOCATION"
+            
+            body = f"""EMERGENCY SOS ALERT
+
+{user.username} needs immediate help!
+
+📍 LIVE LOCATION: {maps_link}
+Coordinates: {latitude}, {longitude}
+
+IMMEDIATE ACTION REQUIRED!
+This is an automated SOS alert from Proteeti.
+An audio recording will follow shortly."""
+            
+            msg.attach(MIMEText(body, 'plain'))
+            
+            server = smtplib.SMTP('smtp.gmail.com', 587, timeout=10)
+            server.starttls()
+            server.login(GMAIL_SENDER, GMAIL_APP_PASSWORD.replace(" ", ""))
+            server.send_message(msg)
+            server.quit()
+            
+            print(f"[DEBUG] Location SOS sent to {recipient_email}")
+        except Exception as e:
+            print(f"[DEBUG] Failed to send location SOS: {e}")
+            continue
+    
+    return True
+
+
+def send_sos_email_with_audio(user, audio_blob):
+    """Send SOS email with 2-minute audio recording"""
+    if not user.trusted_contacts:
+        print(f"[DEBUG] No trusted contacts found for {user.username}")
+        return False
+    
+    GMAIL_SENDER = os.getenv("GMAIL_SENDER")
+    GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
+    
+    if not GMAIL_SENDER or not GMAIL_APP_PASSWORD:
+        print("[DEBUG] Gmail credentials not configured!")
+        return False
+    
+    audio_size_mb = len(audio_blob) / 1024 / 1024
+    print(f"[DEBUG] Audio file size: {audio_size_mb:.2f} MB")
+    
+    for contact in user.trusted_contacts:
+        try:
+            recipient_email = contact.get('email')
+            print(f"[DEBUG] Sending audio SOS to {recipient_email}")
+            
+            msg = MIMEMultipart()
+            msg['From'] = f"Proteeti <{GMAIL_SENDER}>"
+            msg['To'] = recipient_email
+            msg['Subject'] = "🚨 EMERGENCY SOS ALERT - AUDIO RECORDING"
+            
+            body = f"""EMERGENCY SOS ALERT - AUDIO EVIDENCE
+
+{user.username} emergency audio recording (2 minutes) is attached.
+
+Please review and take immediate action if needed.
+
+This is an automated SOS alert from Proteeti."""
+            
+            msg.attach(MIMEText(body, 'plain'))
+            
+            # Attach audio
+            from email.mime.application import MIMEApplication
+            part = MIMEApplication(audio_blob)
+            part.add_header('Content-Disposition', 'attachment', filename='emergency_audio.webm')
+            msg.attach(part)
+            
+            server = smtplib.SMTP('smtp.gmail.com', 587, timeout=10)
+            server.starttls()
+            server.login(GMAIL_SENDER, GMAIL_APP_PASSWORD.replace(" ", ""))
+            server.send_message(msg)
+            server.quit()
+            
+            print(f"[DEBUG] Audio SOS sent successfully to {recipient_email}")
+        except Exception as e:
+            print(f"[DEBUG] Failed to send audio SOS: {e}")
+            continue
+    
+    return True
+
+
+
 # ======= Routes =======
 @app.route("/")
 def index():
     return render_template("index.html")
+
+@app.route("/")
+def home():
+    return render_template('base.html', config=current_app.config)
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -169,7 +302,6 @@ def register():
             error = "Passwords do not match."
             return render_template("register.html", error=error)
         
-        # Check if user exists in database
         if User.query.filter_by(username=username).first():
             error = "Username already exists."
             return render_template("register.html", error=error)
@@ -455,7 +587,6 @@ def edit_profile():
 
     if request.method == "POST":
         form = request.form
-        # Use a copy for safety
         profile = dict(user.profile) if user.profile else {}
         for key in profile_fields:
             if key == "location_permission":
@@ -472,11 +603,101 @@ def edit_profile():
 
 
 
+@app.route("/send_sos", methods=["POST"])
+def send_sos():
+    """Send immediate location-based SOS alert"""
+    try:
+        if not session.get("loggedin"):
+            return jsonify({"error": "Please login first"}), 401
+        
+        data = request.get_json()
+        latitude = data.get("latitude")
+        longitude = data.get("longitude")
+        accuracy = data.get("accuracy")
+        
+        if not latitude or not longitude:
+            return jsonify({"error": "Location required"}), 400
+        
+        username = session.get("username")
+        user = User.query.filter_by(username=username).first()
+        
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        
+        # Save SOS alert to database
+        sos_alert = SOSAlert(
+            user_id=user.id,
+            username=username,
+            lat=latitude,
+            lng=longitude,
+            accuracy=accuracy or 0,
+            status='active'
+        )
+        db.session.add(sos_alert)
+        db.session.commit()
+        
+        # Send immediate location email
+        send_sos_email_with_location(user, latitude, longitude)
+        
+        return jsonify({
+            "message": "Location SOS sent. Recording audio...",
+            "status": "success",
+            "alert_id": sos_alert.id
+        }), 200
+    
+    except Exception as e:
+        print(f"[DEBUG] SOS error: {e}")
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 
-@app.route("/sos")
+
+@app.route("/send_sos_audio", methods=["POST"])
+def send_sos_audio():
+    """Send 2-minute audio recording after SOS location"""
+    try:
+        if not session.get("loggedin"):
+            return jsonify({"error": "Please login first"}), 401
+        
+        username = session.get("username")
+        user = User.query.filter_by(username=username).first()
+        
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        
+        audio_file = request.files.get('audio')
+        
+        if not audio_file:
+            return jsonify({"error": "Audio file required"}), 400
+        
+        audio_blob = audio_file.read()
+        
+        if not audio_blob or len(audio_blob) < 100:
+            return jsonify({"error": "Invalid audio data"}), 400
+        
+        print(f"[DEBUG] SOS audio from {username}")
+        print(f"[DEBUG] Audio size: {len(audio_blob) / 1024 / 1024:.2f} MB")
+        
+        send_sos_email_with_audio(user, audio_blob)
+        
+        return jsonify({
+            "message": "Audio SOS sent",
+            "status": "success"
+        }), 200
+    
+    except Exception as e:
+        print(f"[DEBUG] Audio SOS error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/sos')
 def sos():
+    if not session.get("loggedin"):
+        return redirect(url_for("login"))
     return render_template("sos.html")
+
+
+
 
 @app.route("/map")
 def show_map():
@@ -487,21 +708,6 @@ def show_map():
 def resources():
     return render_template("resources.html")
 
-# ======= APIs =======
-@app.route("/send_sos", methods=["POST"])
-def send_sos():
-    try:
-        if not session.get("loggedin"):
-            return jsonify({"error": "Please login first"}), 401
-        
-        sos_data = request.get_json()
-        print("Received SOS from", session.get("username"), sos_data)
-        
-        
-        
-        return jsonify({"message": "SOS alert sent successfully", "status": "ok"}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500    
 
 
 @app.route("/submit_report", methods=["POST"])
@@ -538,6 +744,201 @@ def get_reports_api():
 def logout():
     session.clear()
     return redirect(url_for("index"))
+
+
+@app.route('/api/notifications/subscribe', methods=['POST'])
+@login_required
+def subscribe_to_notifications():
+    """Subscribe user to push notifications"""
+    try:
+        subscription_data = request.get_json()
+        
+        # Validate subscription data
+        if not all(key in subscription_data for key in ['endpoint', 'keys']):
+            return jsonify({'error': 'Invalid subscription data'}), 400
+        
+        # Store subscription in database
+        auth_key = subscription_data['keys'].get('auth')
+        p256dh_key = subscription_data['keys'].get('p256dh')
+        
+        # Check if subscription already exists
+        existing = NotificationSubscription.query.filter_by(
+            endpoint=subscription_data['endpoint']
+        ).first()
+        
+        if existing:
+            existing.is_active = True
+            existing.user_id = current_user.id
+        else:
+            subscription = NotificationSubscription(
+                user_id=current_user.id,
+                endpoint=subscription_data['endpoint'],
+                auth_key=auth_key,
+                p256dh_key=p256dh_key
+            )
+            db.session.add(subscription)
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Subscribed successfully'}), 201
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/notifications/unsubscribe', methods=['POST'])
+@login_required
+def unsubscribe_from_notifications():
+    """Unsubscribe user from push notifications"""
+    try:
+        data = request.get_json()
+        endpoint = data.get('endpoint')
+        
+        subscription = NotificationSubscription.query.filter_by(
+            endpoint=endpoint,
+            user_id=current_user.id
+        ).first()
+        
+        if subscription:
+            subscription.is_active = False
+            db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Unsubscribed successfully'}), 200
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/notifications/send-hazard', methods=['POST'])
+@login_required
+def send_hazard_alert():
+    """Send hazard alert to all active subscriptions (admin only)"""
+    try:
+        if not current_user.is_admin:
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        data = request.get_json()
+        title = data.get('title', 'Hazard Alert')
+        body = data.get('body', 'A new hazard has been detected')
+        urgent = data.get('urgent', False)
+        
+        # Get all active subscriptions
+        subscriptions = NotificationSubscription.query.filter_by(is_active=True).all()
+        
+        if not subscriptions:
+            return jsonify({'success': True, 'sent': 0, 'message': 'No active subscriptions'}), 200
+        
+        # Send to all subscriptions
+        sent_count = 0
+        from pywebpush import webpush, WebPushException
+        
+        for sub in subscriptions:
+            try:
+                payload = {
+                    'title': title,
+                    'body': body,
+                    'tag': 'hazard-alert',
+                    'urgent': urgent,
+                    'timestamp': datetime.utcnow().isoformat()
+                }
+                
+                webpush(
+                    subscription_info={
+                        'endpoint': sub.endpoint,
+                        'keys': {
+                            'auth': sub.auth_key,
+                            'p256dh': sub.p256dh_key
+                        }
+                    },
+                    data=json.dumps(payload),
+                    vapid_private_key=VAPID_PRIVATE_KEY,
+                    vapid_claims={'sub': VAPID_EMAIL}
+                )
+                sent_count += 1
+            except WebPushException as e:
+                # Mark subscription as inactive if it fails
+                if e.response.status_code == 410:
+                    sub.is_active = False
+                    db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'sent': sent_count,
+            'message': f'Hazard alert sent to {sent_count} users'
+        }), 200
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/notifications/send-community', methods=['POST'])
+@login_required
+def send_community_update():
+    """Send community safety update to all active subscriptions"""
+    try:
+        if not current_user.is_admin:
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        data = request.get_json()
+        title = data.get('title', 'Community Update')
+        body = data.get('body', 'Community safety update')
+        
+        subscriptions = NotificationSubscription.query.filter_by(is_active=True).all()
+        
+        if not subscriptions:
+            return jsonify({'success': True, 'sent': 0}), 200
+        
+        sent_count = 0
+        from pywebpush import webpush, WebPushException
+        
+        for sub in subscriptions:
+            try:
+                payload = {
+                    'title': title,
+                    'body': body,
+                    'tag': 'community-update',
+                    'urgent': False,
+                    'timestamp': datetime.utcnow().isoformat()
+                }
+                
+                webpush(
+                    subscription_info={
+                        'endpoint': sub.endpoint,
+                        'keys': {
+                            'auth': sub.auth_key,
+                            'p256dh': sub.p256dh_key
+                        }
+                    },
+                    data=json.dumps(payload),
+                    vapid_private_key=VAPID_PRIVATE_KEY,
+                    vapid_claims={'sub': VAPID_EMAIL}
+                )
+                sent_count += 1
+            except WebPushException as e:
+                if e.response.status_code == 410:
+                    sub.is_active = False
+                    db.session.commit()
+        
+        return jsonify({'success': True, 'sent': sent_count}), 200
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/notifications/status', methods=['GET'])
+@login_required
+def get_notification_status():
+    """Get user's notification subscription status"""
+    try:
+        subscription = NotificationSubscription.query.filter_by(
+            user_id=current_user.id,
+            is_active=True
+        ).first()
+        
+        return jsonify({
+            'subscribed': subscription is not None,
+            'permission': Notification.permission if 'Notification' in dir() else 'unknown'
+        }), 200
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 

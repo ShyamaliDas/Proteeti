@@ -1,12 +1,10 @@
-<!-- =========================
-templates/base.html
-(UI unchanged; removed Google API call from template)
-========================= -->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="vapid-public-key" content="{{ config.VAPID_PUBLIC_KEY }}">
     <title>Proteeti</title>
     <link rel="icon" href="{{ url_for('static', filename='img/Logo.png') }}" width="50" height="50" type="image/png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -15,6 +13,7 @@ templates/base.html
 </head>
 <body class="bg-light">
     <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+        
         <div class="container">
             <a class="navbar-brand fw-bold d-flex align-items-center" href="/">
                 <img src="{{ url_for('static', filename='img/favicon1.png') }}" alt="Proteeti Logo" class="me-2" height="70" width="70">
@@ -52,7 +51,7 @@ templates/base.html
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
-    <div class="modal fade" id="sosModal" tabindex="-1" aria-hidden="true">
+    <!-- <div class="modal fade" id="sosModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content p-3">
                 <div class="modal-body text-center">
@@ -65,7 +64,43 @@ templates/base.html
                 </div>
             </div>
         </div>
-    </div>
+    </div> -->
+
+
+
+
+
+<script>
+document.getElementById('toggle-notifications').addEventListener('click', async function() {
+  const isSubscribed = await window.notificationManager.getSubscriptionStatus();
+  
+  if (isSubscribed) {
+    await window.notificationManager.unsubscribeFromNotifications();
+    this.textContent = 'Enable Notifications';
+    this.classList.remove('btn-primary');
+    this.classList.add('btn-outline-primary');
+  } else {
+    const success = await window.notificationManager.subscribeToNotifications();
+    if (success) {
+      this.textContent = 'Disable Notifications';
+      this.classList.remove('btn-outline-primary');
+      this.classList.add('btn-primary');
+    }
+  }
+});
+
+// Check subscription status on page load
+window.addEventListener('load', async () => {
+  const isSubscribed = await window.notificationManager.getSubscriptionStatus();
+  const button = document.getElementById('toggle-notifications');
+  
+  if (isSubscribed) {
+    button.textContent = 'Disable Notifications';
+    button.classList.remove('btn-outline-primary');
+    button.classList.add('btn-primary');
+  }
+});
+</script>
 
     <script>
         function showModal(id) {
@@ -142,12 +177,19 @@ templates/base.html
             });
         }
     </script>
-    {% if session.get('loggedin') %}
+
+    <button id="toggle-notifications" class="btn btn-sm btn-outline-primary ms-2">
+        Enable Notifications
+    </button>
+
+    <!-- {% if session.get('loggedin') %}
         <button id="floatingSosBtn" class="floating-sos-button" aria-label="Send SOS" title="Send SOS" data-bs-toggle="tooltip">
             <i class="bi bi-exclamation-octagon-fill" aria-hidden="true"></i>
         </button>
-    {% endif %}
-    <script>
+    {% endif %} -->
+
+
+    <!-- <script>
     // Only run this logic if the floating button exists (i.e., user is logged in)
     const floatingSosBtn = document.getElementById('floatingSosBtn');
 
@@ -215,6 +257,47 @@ templates/base.html
         }
     });
     }
+</script> -->
+
+<script src="{{ url_for('static', filename='js/notification-manager.js') }}"></script>
+
+<script>
+setTimeout(function() {
+  const button = document.getElementById('toggle-notifications');
+  if (!button) {
+    console.error('Button not found!');
+    return;
+  }
+  
+  console.log('Button found, attaching click handler');
+  
+  button.addEventListener('click', async function() {
+    console.log('Button clicked!');
+    try {
+      const isSubscribed = await window.notificationManager.getSubscriptionStatus();
+      console.log('Is subscribed:', isSubscribed);
+      
+      if (isSubscribed) {
+        await window.notificationManager.unsubscribeFromNotifications();
+        this.textContent = 'Enable Notifications';
+        this.classList.remove('btn-primary');
+        this.classList.add('btn-outline-primary');
+      } else {
+        const success = await window.notificationManager.subscribeToNotifications();
+        console.log('Subscribe result:', success);
+        if (success) {
+          this.textContent = 'Disable Notifications';
+          this.classList.remove('btn-outline-primary');
+          this.classList.add('btn-primary');
+        }
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  });
+}, 500);
 </script>
+
+
 </body>
 </html>
