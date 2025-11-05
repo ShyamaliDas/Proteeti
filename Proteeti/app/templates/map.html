@@ -5,16 +5,16 @@ templates/map.html
 {% extends "base.html" %}
 {% block content %}
 <div class="container" id="mapContainer" data-loggedin="{{ session.get('loggedin')|tojson }}">
+   
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 class="mb-0">Community Safety Map</h2>
         <div>
             <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#reportModal">Report an unsafe area</button>
         </div>
     </div>
-
-    <div id="map" style="height: 500px; width: 100%; border-radius: 8px;"></div>
-
     <small class="text-muted d-block mt-2">Click anywhere on the map to report an unsafe area</small>
+    <div id="map" style="height: 500px; width: 95%; border-radius: 8px;"></div>
+    
 </div>
 
 <div class="modal fade" id="reportModal" tabindex="-1" aria-hidden="true">

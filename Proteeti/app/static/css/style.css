@@ -397,12 +397,12 @@ h2::after {
 }
 
 .btn-primary {
-  background: var(--bloody-mary) !important;
+  background: var(--bordeaux) !important;
   color: white !important;
 }
 
 .btn-primary:hover {
-  background: var(--bordeaux) !important;
+  background: var(--purple-tulip) !important;
   transform: translateY(-2px);
   box-shadow: 0 4px 15px rgba(186, 1, 5, 0.25) !important;
 }

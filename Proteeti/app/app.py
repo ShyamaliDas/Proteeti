@@ -1,3 +1,14 @@
+# app.py (top area)
+from flask import Flask
+import os
+
+# If templates/static are NOT in the same folder as app.py, point to them safely:
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TEMPLATES_DIR = os.path.join(BASE_DIR, "..", "templates")   # adjust if needed
+STATIC_DIR    = os.path.join(BASE_DIR, "..", "static")      # adjust if needed
+
+app = Flask(__name__, template_folder=TEMPLATES_DIR, static_folder=STATIC_DIR)
+
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from flask_dance.contrib.google import make_google_blueprint, google
 import json, os, re, random, requests, smtplib
@@ -5,7 +16,6 @@ from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
-
 from config.database import Config
 from models.user import db, User, Report
 
@@ -37,7 +47,7 @@ if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
             "https://www.googleapis.com/auth/userinfo.profile",
             "https://www.googleapis.com/auth/userinfo.email",
         ],
-        redirect_to="google_authorized"
+        redirect_to="index"
     )
     app.register_blueprint(google_bp, url_prefix="/login")
 else:
@@ -386,17 +396,44 @@ def onboarding():
         return redirect(url_for("logout"))
 
     if request.method == "POST":
-        # Accept either form data or JSON
-        data = request.form or request.get_json(silent=True) or {}
-        for key in ["full_name", "phone", "country", "city", "language", "timezone", "other_optional_fields"]:
-            value = data.get(key)
-            if value is not None:
-                # Create profile dict if needed
-                if not user.profile:
-                    user.profile = {}
-                user.profile[key] = value
+        data = request.form
+        
+        # Create profile dict if needed
+        if not user.profile:
+            user.profile = {}
+            
+        # Handle all form fields including dropdowns
+        profile_fields = ["full_name", "phone", "city", "language", "timezone"]
+        for field in profile_fields:
+            value = data.get(field)
+            if value:
+                user.profile[field] = value
+        
+            # Store both country code and country name
+            country_code = data.get("country")  # This is the code (BD, US, IN)
+            country_name = data.get("country_name")  # This comes from the hidden field
+
+            if country_code:
+                user.profile["country"] = country_code
+            if country_name:
+                user.profile["country_name"] = country_name
+        
+            trusted_contact = {
+                "id": len(user.trusted_contacts) + 1 if user.trusted_contacts else 1,
+                "name": data.get("tc_name"),
+                "relation": data.get("tc_relation"), 
+                "email": data.get("tc_email"),
+                "phone": data.get("tc_phone"),
+                "channel": data.get("tc_channel")
+            }
+                    
+        if not user.trusted_contacts:
+            user.trusted_contacts = []
+        user.trusted_contacts.append(trusted_contact)
+        
         db.session.commit()  
         return redirect(url_for("index"))  
+        
     return render_template("onboarding.html", username=username)
 
 
