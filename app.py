@@ -236,7 +236,7 @@ This is an automated SOS alert from Proteeti."""
 def index():
     return render_template("index.html")
 
-@app.route("/base-test")
+@app.route("/")
 def home():
     return render_template('base.html', config=current_app.config)
 
@@ -732,6 +732,302 @@ def logout():
     session.clear()
     return redirect(url_for("index"))
 
+# Add these routes to your app.py
+
+@app.route("/admin/setup", methods=["GET", "POST"])
+def admin_setup():
+    """One-time admin setup page"""
+    from models.user import Admin
+    
+    # Check if any admin already exists
+    if Admin.query.first():
+        return "Admin already exists! Go to <a href='/admin/login'>/admin/login</a>"
+    
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        confirm = request.form.get("confirm_password", "")
+        
+        if not username or not password:
+            return render_template("admin_setup.html", error="All fields required")
+        
+        if password != confirm:
+            return render_template("admin_setup.html", error="Passwords don't match")
+        
+        if len(password) < 8:
+            return render_template("admin_setup.html", error="Password must be at least 8 characters")
+        
+        # Create admin
+        admin = Admin(username=username)
+        admin.set_password(password)
+        db.session.add(admin)
+        db.session.commit()
+        
+        return redirect(url_for("admin_login"))
+    
+    return render_template("admin_setup.html")
+
+# Admin login page
+@app.route("/admin/login", methods=["GET", "POST"])
+def admin_login():
+    error = None
+    if request.method == "POST":
+        admin_username = request.form.get("admin_username", "").strip()
+        admin_password = request.form.get("admin_password", "")
+        
+        from models.user import Admin
+        admin = Admin.query.filter_by(username=admin_username).first()
+        
+        if admin and admin.check_password(admin_password):
+            session.clear()
+            session["admin_loggedin"] = True
+            session["admin_username"] = admin.username
+            session.modified = True
+            print(f"[ADMIN] Login successful: {admin.username}")
+            return redirect(url_for("admin_dashboard"))
+        else:
+            error = "Invalid admin credentials"
+            print(f"[ADMIN] Failed login attempt: {admin_username}")
+    
+    return render_template("admin_login.html", error=error)
+
+# Admin dashboard (protected)
+@app.route("/admin")
+def admin_dashboard():
+    if not session.get("admin_loggedin"):
+        return redirect(url_for("admin_login"))
+    
+    return render_template("admin.html", admin_username=session.get("admin_username"))
+
+# Admin logout
+@app.route("/admin/logout")
+def admin_logout():
+    session.pop("admin_loggedin", None)
+    session.pop("admin_username", None)
+    return redirect(url_for("admin_login"))
+
+# Protect all admin API routes
+def require_admin_api():
+    if not session.get("admin_loggedin"):
+        return jsonify({"error": "Unauthorized - Admin access required"}), 401
+    return None
+
+@app.route("/api/admin/sos-alerts")
+def get_admin_sos_alerts():
+    check = require_admin_api()
+    if check: return check
+    
+    alerts = SOSAlert.query.order_by(SOSAlert.created_at.desc()).all()
+    return jsonify([alert.to_dict() for alert in alerts])
+
+@app.route("/api/admin/sos-alerts/<int:alert_id>/resolve", methods=["POST"])
+def resolve_sos_alert(alert_id):
+    check = require_admin_api()
+    if check: return check
+    
+    alert = SOSAlert.query.get(alert_id)
+    if alert:
+        alert.status = 'resolved'
+        db.session.commit()
+        return jsonify({"message": "Alert resolved"}), 200
+    return jsonify({"error": "Alert not found"}), 404
+
+@app.route("/api/admin/users")
+def get_admin_users():
+    check = require_admin_api()
+    if check: return check
+    
+    users = User.query.all()
+    return jsonify([{
+        "id": u.id,
+        "username": u.username,
+        "email": u.email,
+        "verified": u.verified,
+        "trusted_contacts_count": len(u.trusted_contacts) if u.trusted_contacts else 0,
+        "created_at": u.created_at.isoformat() if hasattr(u, 'created_at') else None
+    } for u in users])
+
+@app.route("/api/admin/reports/<int:report_id>", methods=["DELETE"])
+def delete_admin_report(report_id):
+    check = require_admin_api()
+    if check: return check
+    
+    report = Report.query.get(report_id)
+    if report:
+        db.session.delete(report)
+        db.session.commit()
+        return jsonify({"message": "Report deleted"}), 200
+    return jsonify({"error": "Report not found"}), 404
+
+# Add these routes to your app.py file
+
+@app.route("/admin/settings")
+def admin_settings():
+    """Admin settings page"""
+    if not session.get("admin_loggedin"):
+        return redirect(url_for("admin_login"))
+    return render_template("admin_management.html", admin_username=session.get("admin_username"))
+
+@app.route("/api/admin/change-password", methods=["POST"])
+def admin_change_password():
+    """Change admin password"""
+    if not session.get("admin_loggedin"):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        data = request.get_json()
+        current_password = data.get("current_password")
+        new_password = data.get("new_password")
+        
+        if not current_password or not new_password:
+            return jsonify({"error": "All fields required"}), 400
+        
+        if len(new_password) < 8:
+            return jsonify({"error": "Password must be at least 8 characters"}), 400
+        
+        from models.user import Admin
+        admin_username = session.get("admin_username")
+        admin = Admin.query.filter_by(username=admin_username).first()
+        
+        if not admin or not admin.check_password(current_password):
+            return jsonify({"error": "Current password is incorrect"}), 400
+        
+        admin.set_password(new_password)
+        db.session.commit()
+        
+        return jsonify({"message": "Password updated successfully"}), 200
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/admin/list-admins")
+def list_admins():
+    """List all admin accounts"""
+    if not session.get("admin_loggedin"):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        from models.user import Admin
+        admins = Admin.query.all()
+        current_admin = session.get("admin_username")
+        
+        admin_list = [{
+            "username": admin.username,
+            "created_at": admin.created_at.isoformat() if hasattr(admin, 'created_at') else None,
+            "is_current": admin.username == current_admin
+        } for admin in admins]
+        
+        return jsonify({"admins": admin_list}), 200
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/admin/add-admin", methods=["POST"])
+def add_admin():
+    """Add new admin account"""
+    if not session.get("admin_loggedin"):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        data = request.get_json()
+        username = data.get("username", "").strip()
+        password = data.get("password", "")
+        
+        if not username or not password:
+            return jsonify({"error": "Username and password required"}), 400
+        
+        if len(password) < 8:
+            return jsonify({"error": "Password must be at least 8 characters"}), 400
+        
+        from models.user import Admin
+        
+        # Check if admin already exists
+        if Admin.query.filter_by(username=username).first():
+            return jsonify({"error": "Admin username already exists"}), 400
+        
+        # Create new admin
+        new_admin = Admin(username=username)
+        new_admin.set_password(password)
+        db.session.add(new_admin)
+        db.session.commit()
+        
+        return jsonify({"message": f"Admin '{username}' created successfully"}), 201
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/admin/delete-admin", methods=["POST"])
+def delete_admin():
+    """Delete another admin account (cannot delete yourself)"""
+    if not session.get("admin_loggedin"):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        data = request.get_json()
+        username = data.get("username", "").strip()
+        
+        if not username:
+            return jsonify({"error": "Username required"}), 400
+        
+        current_admin = session.get("admin_username")
+        
+        # Cannot delete yourself
+        if username == current_admin:
+            return jsonify({"error": "Cannot delete your own account"}), 400
+        
+        from models.user import Admin
+        admin = Admin.query.filter_by(username=username).first()
+        
+        if not admin:
+            return jsonify({"error": "Admin not found"}), 404
+        
+        # Check if this is the last admin
+        total_admins = Admin.query.count()
+        if total_admins <= 1:
+            return jsonify({"error": "Cannot delete the last admin"}), 400
+        
+        db.session.delete(admin)
+        db.session.commit()
+        
+        return jsonify({"message": f"Admin '{username}' deleted successfully"}), 200
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/admin/delete-own-account", methods=["POST"])
+def delete_own_admin_account():
+    """Delete your own admin account"""
+    if not session.get("admin_loggedin"):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        from models.user import Admin
+        
+        # Check if this is the last admin
+        total_admins = Admin.query.count()
+        if total_admins <= 1:
+            return jsonify({"error": "Cannot delete the last admin account"}), 400
+        
+        current_admin = session.get("admin_username")
+        admin = Admin.query.filter_by(username=current_admin).first()
+        
+        if not admin:
+            return jsonify({"error": "Admin not found"}), 404
+        
+        db.session.delete(admin)
+        db.session.commit()
+        
+        # Clear session
+        session.clear()
+        
+        return jsonify({"message": "Account deleted successfully"}), 200
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/notifications/subscribe', methods=['POST'])
 @login_required
@@ -931,5 +1227,5 @@ def get_notification_status():
 
 
 
-#if __name__ == "__main__":
- #   app.run(host="0.0.0.0", port=5000, debug=True)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)

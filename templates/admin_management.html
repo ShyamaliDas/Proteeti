@@ -1,0 +1,644 @@
+{% extends "base.html" %}
+{% block content %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+<style>
+.admin-settings-container {
+    max-width: 1000px;
+    margin: 40px auto;
+    padding: 0 20px;
+}
+
+.settings-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 10px 40px var(--soft-shadow);
+    padding: 35px;
+    margin-bottom: 25px;
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid var(--organza-peach);
+}
+
+.card-icon {
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(135deg, var(--bordeaux), var(--purple-tulip));
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 24px;
+}
+
+.card-title {
+    flex: 1;
+}
+
+.card-title h2 {
+    color: var(--bordeaux);
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 0 5px 0;
+}
+
+.card-title p {
+    color: var(--purple-tulip);
+    opacity: 0.8;
+    margin: 0;
+    font-size: 14px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    color: var(--bordeaux);
+    font-weight: 600;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 12px 15px;
+    border: 2px solid rgba(123, 0, 44, 0.15);
+    border-radius: 10px;
+    font-size: 15px;
+    transition: all 0.3s;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: var(--bordeaux);
+    box-shadow: 0 0 0 3px rgba(123, 0, 44, 0.08);
+}
+
+.btn-primary {
+    background: var(--bordeaux);
+    color: white;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 15px;
+}
+
+.btn-primary:hover {
+    background: var(--purple-tulip);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 20px rgba(123, 0, 44, 0.3);
+}
+
+.btn-danger {
+    background: var(--bloody-mary);
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 14px;
+}
+
+.btn-danger:hover {
+    background: #990000;
+}
+
+.alert {
+    padding: 15px 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+}
+
+.alert i {
+    font-size: 20px;
+}
+
+.alert-success {
+    background: rgba(0, 200, 100, 0.1);
+    color: #008844;
+    border-left: 4px solid #00cc66;
+}
+
+.alert-error {
+    background: rgba(186, 1, 5, 0.1);
+    color: var(--bloody-mary);
+    border-left: 4px solid var(--bloody-mary);
+}
+
+.alert-info {
+    background: rgba(234, 88, 20, 0.1);
+    color: var(--furious-tiger);
+    border-left: 4px solid var(--furious-tiger);
+}
+
+.admin-list {
+    margin-top: 20px;
+}
+
+.admin-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background: var(--organza-peach);
+    border-radius: 10px;
+    margin-bottom: 10px;
+}
+
+.admin-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.admin-avatar {
+    width: 40px;
+    height: 40px;
+    background: var(--bordeaux);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+}
+
+.admin-details h4 {
+    color: var(--bordeaux);
+    margin: 0 0 3px 0;
+    font-size: 16px;
+}
+
+.admin-details p {
+    color: var(--purple-tulip);
+    margin: 0;
+    font-size: 13px;
+    opacity: 0.8;
+}
+
+.badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.badge-you {
+    background: rgba(123, 0, 44, 0.1);
+    color: var(--bordeaux);
+}
+
+.password-strength {
+    margin-top: 8px;
+    font-size: 13px;
+}
+
+.strength-bar {
+    height: 4px;
+    background: rgba(123, 0, 44, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 5px;
+}
+
+.strength-fill {
+    height: 100%;
+    transition: all 0.3s;
+    border-radius: 2px;
+}
+
+.strength-weak { 
+    width: 33%; 
+    background: var(--bloody-mary); 
+}
+
+.strength-medium { 
+    width: 66%; 
+    background: var(--furious-tiger); 
+}
+
+.strength-strong { 
+    width: 100%; 
+    background: #00cc66; 
+}
+
+.security-tips {
+    background: rgba(234, 88, 20, 0.05);
+    border-left: 4px solid var(--furious-tiger);
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 20px;
+}
+
+.security-tips h4 {
+    color: var(--bordeaux);
+    font-size: 15px;
+    margin: 0 0 10px 0;
+}
+
+.security-tips ul {
+    margin: 0;
+    padding-left: 20px;
+    color: var(--purple-tulip);
+}
+
+.security-tips li {
+    margin-bottom: 5px;
+    font-size: 13px;
+}
+
+.danger-zone {
+    border: 2px solid rgba(186, 1, 5, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.danger-zone h4 {
+    color: var(--bloody-mary);
+    margin: 0 0 10px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.danger-zone p {
+    color: var(--purple-tulip);
+    font-size: 14px;
+    margin-bottom: 15px;
+}
+</style>
+
+<div class="admin-settings-container">
+    <!-- Page Header -->
+    <div class="settings-card">
+        <div class="card-header">
+            <div class="card-icon">
+                <i class="bi bi-gear-fill"></i>
+            </div>
+            <div class="card-title">
+                <h2>Admin Settings</h2>
+                <p>Manage admin accounts and security settings</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Password -->
+    <div class="settings-card">
+        <div class="card-header">
+            <div class="card-icon">
+                <i class="bi bi-key-fill"></i>
+            </div>
+            <div class="card-title">
+                <h2>Change Password</h2>
+                <p>Update your admin password</p>
+            </div>
+        </div>
+
+        <div id="password-alert"></div>
+
+        <form id="changePasswordForm">
+            <div class="form-group">
+                <label>Current Password</label>
+                <input type="password" id="current_password" required>
+            </div>
+
+            <div class="form-group">
+                <label>New Password</label>
+                <input type="password" id="new_password" required minlength="8">
+                <div id="password-strength" class="password-strength"></div>
+            </div>
+
+            <div class="form-group">
+                <label>Confirm New Password</label>
+                <input type="password" id="confirm_password" required>
+            </div>
+
+            <button type="submit" class="btn-primary">
+                <i class="bi bi-check-circle"></i> Update Password
+            </button>
+        </form>
+
+        <div class="security-tips">
+            <h4><i class="bi bi-shield-check"></i> Password Security Tips</h4>
+            <ul>
+                <li>Use at least 12 characters</li>
+                <li>Mix uppercase, lowercase, numbers, and symbols</li>
+                <li>Avoid common words or personal information</li>
+                <li>Don't reuse passwords from other accounts</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Manage Admins -->
+    <div class="settings-card">
+        <div class="card-header">
+            <div class="card-icon">
+                <i class="bi bi-people-fill"></i>
+            </div>
+            <div class="card-title">
+                <h2>Admin Accounts</h2>
+                <p>View and manage admin users</p>
+            </div>
+        </div>
+
+        <div id="admins-alert"></div>
+
+        <div class="admin-list" id="admin-list">
+            <!-- Admins will be loaded here -->
+        </div>
+
+        <!-- Add New Admin -->
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid var(--organza-peach);">
+            <h3 style="color: var(--bordeaux); margin-bottom: 20px;">Add New Admin</h3>
+            
+            <form id="addAdminForm">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="new_admin_username" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="new_admin_password" required minlength="8">
+                </div>
+
+                <div class="form-group">
+                    <label>Confirm Password</label>
+                    <input type="password" id="new_admin_confirm" required>
+                </div>
+
+                <button type="submit" class="btn-primary">
+                    <i class="bi bi-plus-circle"></i> Add Admin
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Danger Zone -->
+    <div class="settings-card">
+        <div class="danger-zone">
+            <h4><i class="bi bi-exclamation-triangle-fill"></i> Danger Zone</h4>
+            <p>Careful! These actions cannot be undone.</p>
+            
+            <button class="btn-danger" onclick="confirmDeleteAccount()">
+                <i class="bi bi-trash"></i> Delete My Admin Account
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Password strength checker
+document.getElementById('new_password')?.addEventListener('input', function(e) {
+    const password = e.target.value;
+    const strengthDiv = document.getElementById('password-strength');
+    
+    if (!password) {
+        strengthDiv.innerHTML = '';
+        return;
+    }
+    
+    let strength = 0;
+    if (password.length >= 8) strength++;
+    if (password.length >= 12) strength++;
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
+    if (/\d/.test(password)) strength++;
+    if (/[^a-zA-Z0-9]/.test(password)) strength++;
+    
+    let label, className;
+    if (strength <= 2) {
+        label = 'Weak';
+        className = 'strength-weak';
+    } else if (strength <= 4) {
+        label = 'Medium';
+        className = 'strength-medium';
+    } else {
+        label = 'Strong';
+        className = 'strength-strong';
+    }
+    
+    strengthDiv.innerHTML = `
+        <div>Password strength: <strong>${label}</strong></div>
+        <div class="strength-bar">
+            <div class="strength-fill ${className}"></div>
+        </div>
+    `;
+});
+
+// Change password form
+document.getElementById('changePasswordForm')?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const currentPassword = document.getElementById('current_password').value;
+    const newPassword = document.getElementById('new_password').value;
+    const confirmPassword = document.getElementById('confirm_password').value;
+    
+    if (newPassword !== confirmPassword) {
+        showAlert('password-alert', 'error', 'New passwords do not match');
+        return;
+    }
+    
+    if (newPassword.length < 8) {
+        showAlert('password-alert', 'error', 'Password must be at least 8 characters');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/admin/change-password', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                current_password: currentPassword,
+                new_password: newPassword
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showAlert('password-alert', 'success', 'Password updated successfully!');
+            e.target.reset();
+            document.getElementById('password-strength').innerHTML = '';
+        } else {
+            showAlert('password-alert', 'error', data.error || 'Failed to update password');
+        }
+    } catch (error) {
+        showAlert('password-alert', 'error', 'Error updating password');
+    }
+});
+
+// Add new admin form
+document.getElementById('addAdminForm')?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const username = document.getElementById('new_admin_username').value.trim();
+    const password = document.getElementById('new_admin_password').value;
+    const confirm = document.getElementById('new_admin_confirm').value;
+    
+    if (password !== confirm) {
+        showAlert('admins-alert', 'error', 'Passwords do not match');
+        return;
+    }
+    
+    if (password.length < 8) {
+        showAlert('admins-alert', 'error', 'Password must be at least 8 characters');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/admin/add-admin', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ username, password })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showAlert('admins-alert', 'success', `Admin "${username}" added successfully!`);
+            e.target.reset();
+            loadAdmins();
+        } else {
+            showAlert('admins-alert', 'error', data.error || 'Failed to add admin');
+        }
+    } catch (error) {
+        showAlert('admins-alert', 'error', 'Error adding admin');
+    }
+});
+
+// Load admin list
+async function loadAdmins() {
+    try {
+        const response = await fetch('/api/admin/list-admins');
+        const data = await response.json();
+        
+        const adminList = document.getElementById('admin-list');
+        
+        if (data.admins && data.admins.length > 0) {
+            adminList.innerHTML = data.admins.map(admin => `
+                <div class="admin-item">
+                    <div class="admin-info">
+                        <div class="admin-avatar">${admin.username.charAt(0).toUpperCase()}</div>
+                        <div class="admin-details">
+                            <h4>${admin.username}</h4>
+                            <p>Created: ${new Date(admin.created_at).toLocaleDateString()}</p>
+                        </div>
+                    </div>
+                    <div>
+                        ${admin.is_current ? 
+                            '<span class="badge badge-you">You</span>' : 
+                            `<button class="btn-danger" onclick="deleteAdmin('${admin.username}')">
+                                <i class="bi bi-trash"></i> Remove
+                            </button>`
+                        }
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            adminList.innerHTML = '<div class="alert alert-info"><i class="bi bi-info-circle"></i> No other admins</div>';
+        }
+    } catch (error) {
+        console.error('Error loading admins:', error);
+    }
+}
+
+// Delete admin
+async function deleteAdmin(username) {
+    if (!confirm(`Are you sure you want to remove admin "${username}"?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/admin/delete-admin', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ username })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showAlert('admins-alert', 'success', 'Admin removed successfully');
+            loadAdmins();
+        } else {
+            showAlert('admins-alert', 'error', data.error || 'Failed to remove admin');
+        }
+    } catch (error) {
+        showAlert('admins-alert', 'error', 'Error removing admin');
+    }
+}
+
+// Delete own account
+function confirmDeleteAccount() {
+    const confirm1 = confirm('⚠️ WARNING: This will delete your admin account!\n\nAre you absolutely sure?');
+    if (!confirm1) return;
+    
+    const confirm2 = prompt('Type "DELETE" to confirm account deletion:');
+    if (confirm2 !== 'DELETE') {
+        alert('Deletion cancelled');
+        return;
+    }
+    
+    deleteOwnAccount();
+}
+
+async function deleteOwnAccount() {
+    try {
+        const response = await fetch('/api/admin/delete-own-account', {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            alert('Account deleted. You will be logged out.');
+            window.location.href = '/admin/logout';
+        } else {
+            const data = await response.json();
+            alert('Error: ' + (data.error || 'Failed to delete account'));
+        }
+    } catch (error) {
+        alert('Error deleting account');
+    }
+}
+
+// Show alert helper
+function showAlert(elementId, type, message) {
+    const alertDiv = document.getElementById(elementId);
+    const icon = type === 'success' ? 'check-circle-fill' : 
+                 type === 'error' ? 'exclamation-circle-fill' : 'info-circle-fill';
+    
+    alertDiv.innerHTML = `
+        <div class="alert alert-${type}">
+            <i class="bi bi-${icon}"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    
+    setTimeout(() => {
+        alertDiv.innerHTML = '';
+    }, 5000);
+}
+
+// Load admins on page load
+document.addEventListener('DOMContentLoaded', loadAdmins);
+</script>
+
+{% endblock %}
