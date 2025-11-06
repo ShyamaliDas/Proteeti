@@ -20,7 +20,7 @@ load_dotenv()
 DEV_MODE = os.getenv("DEV_MODE", "False").lower() in ("1", "true", "yes")
 os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
-app = Flask(__name__, template_folder="templates", static_folder="static")
+app = Flask(__name__)
 app.config.from_object(Config)
 
 
@@ -236,7 +236,7 @@ This is an automated SOS alert from Proteeti."""
 def index():
     return render_template("index.html")
 
-@app.route("/")
+@app.route("/base-test")
 def home():
     return render_template('base.html', config=current_app.config)
 
