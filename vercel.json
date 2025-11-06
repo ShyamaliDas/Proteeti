@@ -1,13 +1,15 @@
 {
   "version": 2,
-  "functions": {
-    "Proteeti/Proteeti/app/app.py": { "runtime": "python3.11" }
-  },
   "builds": [
-    { "src": "Proteeti/Proteeti/app/app.py", "use": "@vercel/python" }
+    {
+      "src": "app.py",
+      "use": "@vercel/python"
+    }
   ],
   "routes": [
-    { "src": "/(.*)", "dest": "Proteeti/Proteeti/app/app.py" }
-  ],
-  "installCommand": "pip install -r Proteeti/Proteeti/app/requirements.txt"
+    {
+      "src": "/(.*)",
+      "dest": "app.py"
+    }
+  ]
 }

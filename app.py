@@ -1,16 +1,3 @@
-# app.py (top area)
-from flask import Flask
-import os
-from flask_cors import CORS
-
-# If templates/static are NOT in the same folder as app.py, point to them safely:
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-TEMPLATES_DIR = os.path.join(BASE_DIR, "..", "templates")   # adjust if needed
-STATIC_DIR    = os.path.join(BASE_DIR, "..", "static")      # adjust if needed
-
-app = Flask(__name__, template_folder=TEMPLATES_DIR, static_folder=STATIC_DIR)
-CORS(app)
-
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from flask_dance.contrib.google import make_google_blueprint, google
 from flask_migrate import Migrate
@@ -932,9 +919,11 @@ def get_notification_status():
             is_active=True
         ).first()
         
+        # Server-side code cannot access the browser Notification API;
+        # return a safe fallback value. Client should query Notification.permission.
         return jsonify({
             'subscribed': subscription is not None,
-            'permission': Notification.permission if 'Notification' in dir() else 'unknown'
+            'permission': 'unknown'
         }), 200
     
     except Exception as e:
@@ -942,5 +931,5 @@ def get_notification_status():
 
 
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+#if __name__ == "__main__":
+ #   app.run(host="0.0.0.0", port=5000, debug=True)
