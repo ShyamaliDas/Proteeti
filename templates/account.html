@@ -1,0 +1,638 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.dashboard-wrapper {
+    max-width: 1400px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 10px 40px var(--soft-shadow);
+    display: flex;
+    min-height: 80vh;
+}
+
+.dashboard-sidebar {
+    width: 280px;
+    background: linear-gradient(180deg, var(--bordeaux) 0%, var(--purple-tulip) 100%);
+    color: white;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-header {
+    padding: 30px 25px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-header h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: white;
+    margin: 0;
+    letter-spacing: 0.5px;
+}
+
+.sidebar-header h2::after {
+    display: none;
+}
+
+.sidebar-nav {
+    flex: 1;
+    padding: 20px 0;
+}
+
+.sidebar-item {
+    padding: 16px 25px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-left: 4px solid transparent;
+    font-weight: 500;
+    font-size: 15px;
+}
+
+.sidebar-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.sidebar-item.active {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    border-left-color: var(--furious-tiger);
+}
+
+.sidebar-icon {
+    font-size: 20px;
+    width: 24px;
+    text-align: center;
+}
+
+.dashboard-content {
+    flex: 1;
+    padding: 40px;
+    background: var(--organza-peach);
+    overflow-y: auto;
+}
+
+.content-header {
+    margin-bottom: 30px;
+}
+
+.content-header h1 {
+    font-size: 32px;
+    color: var(--bordeaux);
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+.content-header p {
+    color: var(--purple-tulip);
+    opacity: 0.8;
+    margin: 0;
+}
+
+.content-section {
+    display: none;
+}
+
+.content-section.active {
+    display: block;
+    animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.info-card {
+    background: white;
+    border-radius: 16px;
+    padding: 30px;
+    margin-bottom: 25px;
+    box-shadow: 0 4px 15px var(--soft-shadow);
+    transition: transform 0.3s ease;
+}
+
+.info-card:hover {
+    transform: translateY(-2px);
+}
+
+.info-row {
+    display: flex;
+    padding: 15px 0;
+    border-bottom: 1px solid rgba(123, 0, 44, 0.08);
+}
+
+.info-row:last-child {
+    border-bottom: none;
+}
+
+.info-label {
+    font-weight: 600;
+    color: var(--bordeaux);
+    width: 180px;
+    flex-shrink: 0;
+}
+
+.info-value {
+    color: var(--purple-tulip);
+    flex: 1;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--purple-tulip);
+    opacity: 0.6;
+}
+
+.empty-state i {
+    font-size: 48px;
+    margin-bottom: 20px;
+    display: block;
+}
+
+.contact-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 10px var(--soft-shadow);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+}
+
+.contact-card:hover {
+    transform: translateX(5px);
+    box-shadow: 0 4px 15px var(--soft-shadow);
+}
+
+.contact-info h3 {
+    color: var(--bordeaux);
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.contact-details {
+    color: var(--purple-tulip);
+    font-size: 14px;
+}
+
+.contact-details div {
+    margin-bottom: 4px;
+}
+
+.badge-yes {
+    background: rgba(123, 0, 44, 0.1);
+    color: var(--bordeaux);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.badge-no {
+    background: rgba(123, 0, 44, 0.05);
+    color: var(--purple-tulip);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.section-actions {
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
+}
+
+@media (max-width: 992px) {
+    .dashboard-wrapper {
+        flex-direction: column;
+    }
+    
+    .dashboard-sidebar {
+        width: 100%;
+    }
+    
+    .sidebar-nav {
+        display: flex;
+        overflow-x: auto;
+        padding: 10px 0;
+    }
+    
+    .sidebar-item {
+        white-space: nowrap;
+        border-left: none;
+        border-bottom: 4px solid transparent;
+    }
+    
+    .sidebar-item.active {
+        border-left: none;
+        border-bottom-color: var(--furious-tiger);
+    }
+}
+</style>
+
+<div class="dashboard-wrapper">
+    <!-- Sidebar -->
+    <div class="dashboard-sidebar">
+        <div class="sidebar-header">
+            <h2><i class="bi bi-person-circle"></i> {{ username }}</h2>
+        </div>
+        
+        <div class="sidebar-nav">
+            <div class="sidebar-item active" onclick="showSection('core')">
+                <span class="sidebar-icon"><i class="bi bi-file-text"></i></span>
+                <span>Core Details</span>
+            </div>
+            <div class="sidebar-item" onclick="showSection('contacts')">
+                <span class="sidebar-icon"><i class="bi bi-people"></i></span>
+                <span>Trusted Contacts</span>
+            </div>
+            <div class="sidebar-item" onclick="showSection('consent')">
+                <span class="sidebar-icon"><i class="bi bi-shield-lock"></i></span>
+                <span>Consent & Preferences</span>
+            </div>
+            <div class="sidebar-item" onclick="showSection('optional')">
+                <span class="sidebar-icon"><i class="bi bi-gear"></i></span>
+                <span>Additional Info</span>
+            </div>
+            <div class="sidebar-item" onclick="showSection('nice')">
+                <span class="sidebar-icon"><i class="bi bi-star"></i></span>
+                <span>Profile Extras</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="dashboard-content">
+        <div class="alert alert-danger d-none" id="errorMessage"></div>
+        <div class="alert alert-success d-none" id="successMessage"></div>
+
+        <!-- SECTION A: Core Details -->
+        <div class="content-section active" id="section-core">
+            <div class="content-header">
+                <h1>Core Details</h1>
+                <p>Essential information for your safety profile</p>
+            </div>
+
+            <div class="info-card">
+                <div class="info-row">
+                    <div class="info-label">Username</div>
+                    <div class="info-value">{{ user.username }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email</div>
+                    <div class="info-value">{{ user.email }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Full Name</div>
+                    <div class="info-value">{{ user.profile.full_name or '—' }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Mobile Phone</div>
+                    <div class="info-value">{{ user.profile.phone or '—' }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Country</div>
+                    <div class="info-value">{{ user.profile.country_name or '—' }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">City</div>
+                    <div class="info-value">{{ user.profile.city or '—' }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Primary Language</div>
+                    <div class="info-value">{{ user.profile.language or '—' }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Timezone</div>
+                    <div class="info-value">{{ user.profile.timezone or '—' }}</div>
+                </div>
+            </div>
+
+            <div class="section-actions">
+                <a href="{{ url_for('edit_profile') }}" class="btn btn-primary">
+                    <i class="fas fa-edit"></i> Edit Core Details
+                </a>
+            </div>
+        </div>
+
+        <!-- SECTION B: Trusted Contacts -->
+        <div class="content-section" id="section-contacts">
+            <div class="content-header">
+                <h1>Trusted Contacts</h1>
+                <p>People who will be notified in emergencies</p>
+            </div>
+
+            <button class="btn btn-danger mb-4" onclick="toggleAddForm()">
+                <i class="fas fa-plus"></i> Add Trusted Contact
+            </button>
+
+            <!-- Add Contact Form -->
+            <div class="card bg-light border d-none mb-4" id="addContactForm">
+                <div class="card-body">
+                    <h3 class="h5 mb-3">Add New Contact</h3>
+                    <form id="contactForm">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Name *</label>
+                            <input type="text" class="form-control" id="contactName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Email *</label>
+                            <input type="email" class="form-control" id="contactEmail" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Phone Number</label>
+                            <input type="tel" class="form-control" id="contactPhone">
+                        </div>
+                        <div class="md-3">
+                            <label class="form-label fw-bold">Relation</label>
+                            <input class="form-control" id="tc_relation">
+                        </div><br>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-check"></i> Add Contact
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="toggleAddForm()">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Contacts List -->
+            {% if user.trusted_contacts %}
+                {% for contact in user.trusted_contacts %}
+                <div class="contact-card" data-contact-id="{{ contact.id }}">
+                    <div class="contact-info">
+                        <h3>{{ contact.name }}</h3>
+                        <div class="contact-details">
+                            {% if contact.relation %}
+                            <div><strong>Relation:</strong> {{ contact.relation }}</div>
+                            {% endif %}
+                            {% if contact.email %}
+                            <div><strong>Email:</strong> {{ contact.email }}</div>
+                            {% endif %}
+                            {% if contact.phone %}
+                            <div><strong>Phone:</strong> {{ contact.phone }}</div>
+                            {% endif %}
+                            {% if contact.channel %}
+                            <div><strong>Preferred:</strong> {{ contact.channel }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <button class="btn btn-danger btn-sm" onclick="removeContact('{{ contact.id }}')">
+                        <i class="fas fa-trash"></i>Remove
+                    </button>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-users"></i>
+                    <p>No trusted contacts added yet</p>
+                    <p class="small">Add at least one contact for emergencies</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- SECTION C: Consent & Preferences -->
+        <div class="content-section" id="section-consent">
+            <div class="content-header">
+                <h1>Consent & Preferences</h1>
+                <p>Privacy and communication settings</p>
+            </div>
+
+            <div class="info-card">
+                <div class="info-row">
+                    <div class="info-label">Location Permission</div>
+                    <div class="info-value">
+                        {% if user.profile.location_permission %}
+                            <span class="badge-yes">✓ Allowed</span>
+                        {% else %}
+                            <span class="badge-no">✗ Not Allowed</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Privacy Consent</div>
+                    <div class="info-value">
+                        <a href="/privacy-policy" target="_blank" class="text-decoration-underline">View Privacy Policy</a>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Communication Consent</div>
+                    <div class="info-value">{{ user.profile.comms_consent or 'Transactional only' }}</div>
+                </div>
+            </div>
+
+            <div class="section-actions">
+                <a href="{{ url_for('edit_profile') }}" class="btn btn-primary">
+                    <i class="fas fa-edit"></i> Update Preferences
+                </a>
+            </div>
+        </div>
+
+        <!-- SECTION D: Optional Info -->
+        <div class="content-section" id="section-optional">
+            <div class="content-header">
+                <h1>Additional Information</h1>
+                <p>Helpful details for emergency situations</p>
+            </div>
+
+            <div class="info-card">
+                <div class="info-row">
+                    <div class="info-label">Secondary Phone</div>
+                    <div class="info-value">{{ user.profile.secondary_phone or '—' }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Home Area</div>
+                    <div class="info-value">{{ user.profile.home_area or '—' }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Medical Notes</div>
+                    <div class="info-value">{{ user.profile.medical_notes or '—' }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Emergency Instructions</div>
+                    <div class="info-value">{{ user.profile.emergency_instructions or '—' }}</div>
+                </div>
+            </div>
+
+            <div class="section-actions">
+                <a href="{{ url_for('edit_profile') }}" class="btn btn-primary">
+                    <i class="fas fa-edit"></i> Update Information
+                </a>
+            </div>
+        </div>
+
+        <!-- SECTION E: Nice to Have -->
+        <div class="content-section" id="section-nice">
+            <div class="content-header">
+                <h1>Profile Extras</h1>
+                <p>Optional profile enhancements</p>
+            </div>
+
+            <div class="info-card">
+                <div class="info-row">
+                    <div class="info-label">Avatar</div>
+                    <div class="info-value">
+                        {% if user.profile.avatar %}
+                            <img src="{{ user.profile.avatar }}" alt="Avatar" width="60" height="60" style="border-radius: 50%;">
+                        {% else %}
+                            —
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Gender</div>
+                    <div class="info-value">{{ user.profile.gender or '—' }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Date of Birth</div>
+                    <div class="info-value">{{ user.profile.dob or '—' }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Push Token</div>
+                    <div class="info-value">{{ user.profile.push_token or '—' }}</div>
+                </div>
+            </div>
+
+            <div class="section-actions">
+                <a href="{{ url_for('edit_profile') }}" class="btn btn-primary">
+                    <i class="fas fa-edit"></i> Update Profile
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showSection(sectionName) {
+    // Hide all sections
+    document.querySelectorAll('.content-section').forEach(section => {
+        section.classList.remove('active');
+    });
+    
+    // Remove active state from all sidebar items
+    document.querySelectorAll('.sidebar-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    // Show selected section
+    document.getElementById('section-' + sectionName).classList.add('active');
+    
+    // Add active state to clicked sidebar item
+    event.currentTarget.classList.add('active');
+}
+
+function toggleAddForm() {
+    const form = document.getElementById('addContactForm');
+    form.classList.toggle('d-none');
+    if (form.classList.contains('d-none')) {
+        document.getElementById('contactForm').reset();
+    }
+}
+
+function showMessage(message, isError = false) {
+    const errorEl = document.getElementById('errorMessage');
+    const successEl = document.getElementById('successMessage');
+
+    if (isError) {
+        errorEl.textContent = message;
+        errorEl.classList.remove('d-none');
+        successEl.classList.add('d-none');
+    } else {
+        successEl.textContent = message;
+        successEl.classList.remove('d-none');
+        errorEl.classList.add('d-none');
+    }
+
+    setTimeout(() => {
+        errorEl.classList.add('d-none');
+        successEl.classList.add('d-none');
+    }, 5000);
+}
+
+document.getElementById('contactForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const name = document.getElementById('contactName').value;
+    const email = document.getElementById('contactEmail').value;
+    const phone = document.getElementById('contactPhone').value;
+
+    try {
+        const response = await fetch('/add_trusted_contact', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ name, email, phone })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showMessage('Trusted contact added successfully!');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showMessage(data.error || 'Failed to add contact', true);
+        }
+    } catch (error) {
+        showMessage('Error adding contact: ' + error.message, true);
+    }
+});
+
+async function removeContact(contactId) {
+    if (!confirm('Are you sure you want to remove this trusted contact?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/remove_trusted_contact', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ contact_id: contactId })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showMessage('Trusted contact removed successfully!');
+            document.querySelector(`[data-contact-id="${contactId}"]`).remove();
+
+            const contactsList = document.querySelectorAll('[data-contact-id]');
+            if (contactsList.length === 0) {
+                location.reload();
+            }
+        } else {
+            showMessage(data.error || 'Failed to remove contact', true);
+        }
+    } catch (error) {
+        showMessage('Error removing contact: ' + error.message, true);
+    }
+}
+</script>
+
+{% endblock %}
