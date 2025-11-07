@@ -19,53 +19,332 @@
 
     const POLICE_STATIONS = [
 
-        // City Corporations
-        {name: "Dhaka Metropolitan Police (DMP HQ)", lat: 23.743703665023943, lng: 90.4050102021896},
-        {name: "Chattogram Kotwali Police Station", lat: 22.333763695899393, lng: 91.83702871869718},
-        {name: "Khulna Sadar Police Station", lat: 22.817406168019343, lng: 89.56520321936542},
-        {name: "Rajsahi Railway Police Station", lat: 24.38137873891504, lng: 88.61490228790399},
-        {name: "Sylhet Kotwali Police Station", lat: 24.888613441043766, lng: 91.86600071079214},
-        {name: "Kotwali Model Police Station, Barishal Metropolitan Police, Barishal", lat: 22.7063729462711, lng: 90.37189871003748},
-        {name: "Rangpur Metropolitan Police Station", lat: 25.747635512161047, lng: 89.30644353621086},
-        {name: "Kotwali Police Station, Mymensingh Sadar", lat: 24.7496, lng: 90.4071},
-        {name: "Gazipur Sadar Police Station", lat: 24.75769239064875, lng: 90.41238356173437},
-        {name: "Narayanganj Model Thana", lat: 23.61551379827004, lng: 90.5041208868434},
-        {name: "Kotwali Model Police Station, Cumilla", lat: 23.465176718032712, lng: 91.18753561752739},
+
+        // Dhaka 
+
+        { 
+            name: "Dhaka Metropolitan Police (DMP HQ)", 
+            lat: 23.743703665023943, 
+            lng: 90.4050102021896,
+            phone: "028614300",
+            website: "https://dmp.gov.bd/"
+        },
+        { 
+            name: "Chattogram Kotwali Police Station", 
+            lat: 22.333763695899393, 
+            lng: 91.83702871869718,
+            phone: "01713373256",
+            website: "http://www.police.gov.bd/"
+        },
+        { 
+            name: "Gulshan Police Station, Dhaka", 
+            lat: 23.794002947420022,
+            lng: 90.41540826027239,
+            phone: "029895826",
+            website: "http://www.dmp.gov.bd/"
+        },
+
+        { 
+            name: "Mohammadpur Police Station, Dhaka", 
+            lat: 23.759456681630205,
+            lng: 90.36146652877315,
+            phone: "01320040865",
+            website: "http://www.dmp.gov.bd/"
+        },
+        { 
+            name: "Mugda Police Station, Dhaka", 
+            lat: 23.73317420409013,
+            lng: 90.43236641966196,
+            phone: "01320001299",
+            website: "http://www.dmp.gov.bd/"
+        },
+        { 
+            name: "Ramna Model Police Station, Dhaka", 
+            lat: 23.745369213173518,
+            lng: 90.41139894688408,
+            phone: "01713373125",
+            website: "http://www.dmp.gov.bd/"
+        },
+
+        
+        {
+            name: "Khulna Sadar Police Station",
+            lat: 22.817406168019343,
+            lng: 89.56520321936542,
+            phone: "01320058382",
+            website: "https://kmp.police.gov.bd/"
+        },
+        {
+            name: "Rajsahi Railway Police Station",
+            lat: 24.38137873891504,
+            lng: 88.61490228790399,
+            phone: "0721773018",
+            website: ""
+        },
+        {
+            name: "Sylhet Kotwali Police Station",
+            lat: 24.888613441043766,
+            lng: 91.86600071079214,
+            phone: "01713374517",
+            website: "https://smp.police.gov.bd/internal-service/"
+        },
+        {
+            name: "Barishal Metropolitan Police",
+            lat: 22.696620571735842, 
+            lng: 90.36897766510641,
+            phone: "01777399271",
+            website: "http://bmp.police.gov.bd/"
+        },
+        {
+            name: "Rangpur Metropolitan Police Station",
+            lat: 25.747635512161047,
+            lng: 89.30644353621086,
+            phone: "052157057",
+            website: "https://rpmp.rangpurdiv.gov.bd/"
+        },
+        {
+            name: "Kotwali Police Station, Mymensingh Sadar",
+            lat: 24.757799560471224, 
+            lng: 90.41200805241137,
+            phone: "09167761",
+            website: "http://police.mymensinghsadar.mymensingh.gov.bd/"
+        },
+        {
+            name: "Gazipur Sadar Police Station",
+            lat: 24.75769239064875,
+            lng: 90.41238356173437,
+            phone: "029252255",
+            website: "https://police.gazipur.gov.bd/"
+        },
+        {
+            name: "Narayanganj Model Thana",
+            lat: 23.61551379827004,
+            lng: 90.5041208868434,
+            phone: "01320090382",
+            website: "http://narayanganjsadarpolice.narayanganjsadar.narayanganj.gov.bd/"
+        },
+        {
+            name: "Kotwali Model Police Station, Cumilla",
+            lat: 23.465176718032712,
+            lng: 91.18753561752739,
+            phone: "01320113996",
+            website: "https://www.police.gov.bd/en/chittagong_range"
+        },
+
 
         // Police Stations in Sylhet City Area
-        {name: "Shahporan Police Station, Sylhet", lat: 24.87894637579313, lng: 91.91772646967571 },
-        {name: "Airport Police Station, Sylhet", lat: 24.9541, lng: 91.8687 },
-        {name: "South Surma Police Station, Sylhet", lat: 24.95963458757944, lng: 91.86143288818968},
-        {name: "Moglabazar Police Station Sylhet", lat: 24.832478395027348,lng: 91.95259107505561},
-        {name: "Jalalabad Police Station, Sylhet", lat: 24.92485748062061, lng: 91.81653648872269},
 
+        {
+            name: "Shahporan Police Station, Sylhet",
+            lat: 24.87894637579313,
+            lng: 91.91772646967571,
+            phone: "01320067745",
+            website: ""
+        },
+        {
+            name: "Airport Police Station, Sylhet",
+            lat: 24.95971240210415, 
+            lng: 91.86067114076727,
+            phone: "01320-067620",
+            website: ""
+        },
+        {
+            name: "South Surma Police Station, Sylhet",
+            lat: 24.95963458757944,
+            lng: 91.86143288818968,
+            phone: "01713374518",
+            website: "http://www.police.gov.bd/"
+        },
+        {
+            name: "Moglabazar Police Station Sylhet",
+            lat: 24.832478395027348,
+            lng: 91.95259107505561,
+            phone: "01713-374519",
+            website: ""
+        },
+        {
+            name: "Jalalabad Police Station, Sylhet",
+            lat: 24.92485748062061,
+            lng: 91.81653648872269,
+            phone: "01320067558",
+            website: ""
+        },
+
+        
         // Sylhet Division
-        { name: "Habiganj Sadar Police Station", lat: 24.373477377189886, lng: 91.41652620590537},
-        { name: "Sreemangal Police Station", lat: 24.310798128256938, lng: 91.73227252883588},
-        {name: "Moulvibazar Model Police Station", lat: 24.503794737119915, lng: 91.7630964095827},
-        {name: "Sunamganj Police Station", lat: 25.07321936823131, lng: 91.4013043058173},
+
+        {
+            name: "Habiganj Sadar Police Station",
+            lat: 24.373477377189886,
+            lng: 91.41652620590537,
+            phone: "01713374398",
+            website: "http://habiganj.police.gov.bd/"
+        },
+        {
+            name: "Sreemangal Police Station",
+            lat: 24.310798128256938,
+            lng: 91.73227252883588,
+            phone: "01713374440",
+            website: "http://www.police.gov.bd/"
+        },
+        {
+            name: "Moulvibazar Model Police Station",
+            lat: 24.503794737119915,
+            lng: 91.7630964095827,
+            phone: "01713374439",
+            website: "http://www.police.gov.bd/"
+        },
+        {
+            name: "Sunamganj Police Station",
+            lat: 25.07321936823131,
+            lng: 91.4013043058173,
+            phone: "01713374418",
+            website: "https://police.sunamganj.gov.bd/"
+        },
 
 
-        { name: "Tangail Police Station", lat: 24.246834244716094, lng: 89.91335405390348},
-        { name: "Sudharam Model Police Station, Noakhali", lat: 22.872014478562495, lng: 91.0970440230188},
-        { name: "Jessore Police Station, Chowrasta", lat: 23.165719307626254, lng: 89.21386069993413},
-        { name: "Pabna Sadar Police Station", lat: 24.009040390462555, lng: 89.24010036965689},
-        { name: "Bogura Sadar Thana, Bogura", lat: 24.85072366965817, lng: 89.3729468003622},
-        { name: "Dinajpur Kotwali Police Station", lat: 25.63646908545274, lng: 88.63872878133385},
-        { name: "Faridpur Sadar Kotowali Thana", lat: 23.600570171134105, lng: 89.83447021012532},
-        { name: "Magura Police Station", lat: 23.491188930540957, lng: 89.42249889477945},
-        { name: "Narail Police Line", lat: 23.15930067079649, lng: 89.49426410714143},
-        { name: "Satkhira Police Station", lat: 22.7115591671022, lng: 89.07325428127133},
-        { name: "Chandpur Model Thana", lat: 23.224464573541663, lng: 90.65324602731232},
-        { name: "Lalmonirhat Sadar Police Station", lat: 25.916037850701887, lng: 89.44893690460542},
-        { name: "Meherpur Police Station", lat: 23.779318719417855, lng: 88.62580015430848},
-        { name: "Kushtia Police Station", lat: 23.908387027875012, lng: 89.12782844226233},
-        { name: "Bagerhat Sadar Police Station", lat: 22.661465174854598, lng: 89.79456464728229},
-        { name: "Patuakhali Sadar Police Station", lat: 22.36368294240366, lng: 90.34040614078744},
-        { name: "Sirajganj Sadar Police Station", lat: 24.458287699583764, lng: 89.70086354083061}, 
-        { name: "Madaripur Sadar Model Thana", lat: 23.167812464527575, lng: 90.20045939218541},
-        { name: "Sherpur Sadar Thana", lat: 25.012091540661338, lng: 90.0178193083045},
-        { name: "Jamalpur Police Station", lat: 24.939136376099185, lng: 89.93651783713872}
+        // Other Districts
+
+        {
+            name: "Tangail Police Station",
+            lat: 24.246834244716094,
+            lng: 89.91335405390348,
+            phone: "01320001299",
+            website: "http://www.police.gov.bd/"
+        },
+        {
+            name: "Sudharam Model Police Station, Noakhali",
+            lat: 22.872014478562495,
+            lng: 91.0970440230188,
+            phone: "01320001299",
+            website: "https://police.noakhali.gov.bd/"
+        },
+        {
+            name: "Jessore Police Station, Chowrasta",
+            lat: 23.165719307626254,
+            lng: 89.21386069993413,
+            phone: "01320143180",
+            website: "https://police.jessore.gov.bd/"
+        },
+        {
+            name: "Pabna Sadar Police Station",
+            lat: 24.009040390462555,
+            lng: 89.24010036965689,
+            phone: "073165080",
+            website: "http://www.pabnasadarpolice.pabnasadar.pabna.gov.bd/"
+        },
+        {
+            name: "Bogura Sadar Thana, Bogura",
+            lat: 24.85072366965817,
+            lng: 89.3729468003622,
+            phone: "01320126606",
+            website: "http://police.sadar.bogra.gov.bd/"
+        },
+        {
+            name: "Dinajpur Kotwali Police Station",
+            lat: 25.63646908545274,
+            lng: 88.63872878133385,
+            phone: "01320136391",
+            website: "https://police.dinajpur.gov.bd/"
+        },
+        {
+            name: "Faridpur Sadar Kotowali Thana",
+            lat: 23.600570171134105,
+            lng: 89.83447021012532,
+            phone: "01713373556",
+            website: "https://www.faridpur.gov.bd/"
+        },
+        {
+            name: "Magura Police Station",
+            lat: 23.491188930540957,
+            lng: 89.42249889477945,
+            phone: "01713374179",
+            website: "http://police.magurasadar.magura.gov.bd/"
+        },
+        {
+            name: "Narail Police Line",
+            lat: 23.15930067079649,
+            lng: 89.49426410714143,
+            phone: "01719485430",
+            website: "https://police.narail.gov.bd/"
+        },
+        {
+            name: "Satkhira Police Station",
+            lat: 22.7115591671022,
+            lng: 89.07325428127133,
+            phone: "01713374141",
+            website: "https://police.satkhira.gov.bd/"
+        },
+        {
+            name: "Chandpur Model Thana",
+            lat: 23.224464573541663,
+            lng: 90.65324602731232,
+            phone: "01320115981",
+            website: "http://police.sadar.chandpur.gov.bd/"
+        },
+        {   
+            name: "Lalmonirhat Sadar Police Station",
+            lat: 25.916037850701887,
+            lng: 89.44893690460542,
+            phone: "01765890504",
+            website: "http://police.sadar.lalmonirhat.gov.bd/"
+        },
+        {
+            name: "Meherpur Police Station",
+            lat: 23.779318719417855,
+            lng: 88.62580015430848,
+            phone: "01320149164",
+            website: "https://police.meherpur.gov.bd/"
+        },
+        {
+            name: "Kushtia Police Station",
+            lat: 23.908387027875012,
+            lng: 89.12782844226233,
+            phone: "01320147180",
+            website: "http://police.kushtiasadar.kushtia.gov.bd/"
+        },
+        {
+            name: "Bagerhat Sadar Police Station",
+            lat: 22.661465174854598,
+            lng: 89.79456464728229,
+            phone: "01320-141179",
+            website: "http://police.sadar.bagerhat.gov.bd/"
+        },
+        {
+            name: "Patuakhali Sadar Police Station",
+            lat: 22.36368294240366,
+            lng: 90.34040614078744,
+            phone: "01751136237",
+            website: "http://police.sadar.patuakhali.gov.bd/"
+        },
+        {
+            name: "Sirajganj Sadar Police Station",
+            lat: 24.458287699583764,
+            lng: 89.70086354083061,
+            phone: "01723179141",
+            website: "http://www.police.sirajganjsadar.sirajganj.gov.bd/"
+        },
+        {
+            name: "Madaripur Sadar Model Thana",
+            lat: 23.167812464527575,
+            lng: 90.20045939218541,
+            phone: "01320098375",
+            website: "http://police.sadar.madaripur.gov.bd/"
+        },
+        {
+            name: "Sherpur Sadar Thana",
+            lat: 25.012091540661338,
+            lng: 90.0178193083045,
+            phone: "01713373523",
+            website: "http://police.sherpursadar.sherpur.gov.bd/"
+        },
+        {
+            name: "Jamalpur Police Station",
+            lat: 24.939136376099185,
+            lng: 89.93651783713872,
+            phone: "01713373538",
+            website: "https://police.jamalpur.gov.bd/"
+        }
 
         
 
@@ -94,7 +373,12 @@
                 shadowAnchor: [12, 41]
             })
         }).addTo(resourcesMap);
-        marker.bindPopup(`<b>${station.name}</b>`);
+        marker.bindPopup(`
+            <b style="color:#144e70;">${station.name}</b><br>
+            📞 <b>Contact no: ${station.phone ? station.phone : 'N/A'}</b><br>
+            🌐 <b>Website:</b> ${station.website ? `<a href="${station.website}" target="_blank" style="color:#8b0606;">${station.website}</a>` : 'N/A'}
+        `);
+
     });
 </script>
 
