@@ -1,0 +1,68 @@
+<!-- =========================
+templates/register.html
+========================= -->
+{% extends "base.html" %}
+{% block content %}
+<div class="auth-split-container">
+  <div class="auth-card-wrapper">
+    <div class="row g-0 h-100">
+      <!-- Form (LEFT) -->
+      <div class="col-12 col-lg-6 d-flex align-items-center">
+        <div class="register-form-blob w-100">
+          <div class="mx-auto" style="max-width: 420px;">
+            <h1 class="mb-2" style="color:var(--bordeaux); font-weight:700; text-align: center;">Create account</h1>
+            <p class="text-muted mb-4 text-center">Register with your email to get started.</p>
+
+            {% if error %}
+            <div class="alert alert-danger">{{ error }}</div>
+            {% endif %}
+
+            <form method="POST" novalidate>
+              <div class="mb-3">
+                <label class="form-label">Username</label>
+                <input type="text" class="form-control" name="username" required minlength="3" maxlength="30">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Email</label>
+                <input type="email" class="form-control" name="email" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Password</label>
+                <input type="password" class="form-control" name="password" required minlength="8">
+              </div>
+              <div class="mb-4">
+                <label class="form-label">Confirm password</label>
+                <input type="password" class="form-control" name="confirmpassword" required minlength="8">
+              </div>
+
+              <button class="btn btn-danger w-100 btn-lg">Register</button>
+              <p class="text-center mt-3 mb-0">
+                Already have an account?
+                <a href="/login" class="text-danger fw-semibold">Login</a>
+              </p>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Art / Illustration (RIGHT) -->
+      <div class="col-lg-6 d-none d-lg-flex register-art-panel position-relative align-items-center justify-content-center">
+        <div class="text-center text-white px-5">
+          <h2 class="mb-3" style="color: white; font-weight: 700;">Welcome to Proteeti</h2>
+          <p style="color: rgba(255,255,255,0.9); font-size: 1.1rem;">
+            Your safety companion for a secure journey
+          </p>
+        </div>
+        
+        <!-- Decorative circles -->
+        <span class="position-absolute rounded-circle" 
+              style="width:90px;height:90px;background:rgba(255,255,255,.15);right:12%;top:18%;"></span>
+        <span class="position-absolute rounded-circle" 
+              style="width:60px;height:60px;background:rgba(255,255,255,.1);right:20%;top:52%;"></span>
+        <span class="position-absolute rounded-circle" 
+              style="width:40px;height:40px;background:rgba(255,255,255,.08);right:6%;top:72%;"></span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

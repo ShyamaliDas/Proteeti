@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Safety Resources</h2>
+<ul class="list-group">
+    <li class="list-group-item">🚨 National Helpline: 999</li>
+    <li class="list-group-item">📞 Women’s Helpline: 109</li>
+    <li class="list-group-item">🤝 NGO Support: BRAC, Naripokkho</li>
+</ul>
+<h2 class="mb-0">Police Stations</h2>
+
+
+
+<div id="resourcesMap" style="height: 500px; width: 95%; border-radius: 8px;"></div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+
+
+    const POLICE_STATIONS = [
+
+        // City Corporations
+        {name: "Dhaka Metropolitan Police (DMP HQ)", lat: 23.743703665023943, lng: 90.4050102021896},
+        {name: "Chattogram Kotwali Police Station", lat: 22.333763695899393, lng: 91.83702871869718},
+        {name: "Khulna Sadar Police Station", lat: 22.817406168019343, lng: 89.56520321936542},
+        {name: "Rajsahi Railway Police Station", lat: 24.38137873891504, lng: 88.61490228790399},
+        {name: "Sylhet Kotwali Police Station", lat: 24.888613441043766, lng: 91.86600071079214},
+        {name: "Kotwali Model Police Station, Barishal Metropolitan Police, Barishal", lat: 22.7063729462711, lng: 90.37189871003748},
+        {name: "Rangpur Metropolitan Police Station", lat: 25.747635512161047, lng: 89.30644353621086},
+        {name: "Kotwali Police Station, Mymensingh Sadar", lat: 24.7496, lng: 90.4071},
+        {name: "Gazipur Sadar Police Station", lat: 24.75769239064875, lng: 90.41238356173437},
+        {name: "Narayanganj Model Thana", lat: 23.61551379827004, lng: 90.5041208868434},
+        {name: "Kotwali Model Police Station, Cumilla", lat: 23.465176718032712, lng: 91.18753561752739},
+
+        // Police Stations in Sylhet City Area
+        {name: "Shahporan Police Station, Sylhet", lat: 24.87894637579313, lng: 91.91772646967571 },
+        {name: "Airport Police Station, Sylhet", lat: 24.9541, lng: 91.8687 },
+        {name: "South Surma Police Station, Sylhet", lat: 24.95963458757944, lng: 91.86143288818968},
+        {name: "Moglabazar Police Station Sylhet", lat: 24.832478395027348,lng: 91.95259107505561},
+        {name: "Jalalabad Police Station, Sylhet", lat: 24.92485748062061, lng: 91.81653648872269},
+
+        // Sylhet Division
+        { name: "Habiganj Sadar Police Station", lat: 24.373477377189886, lng: 91.41652620590537},
+        { name: "Sreemangal Police Station", lat: 24.310798128256938, lng: 91.73227252883588},
+        {name: "Moulvibazar Model Police Station", lat: 24.503794737119915, lng: 91.7630964095827},
+        {name: "Sunamganj Police Station", lat: 25.07321936823131, lng: 91.4013043058173},
+
+
+        { name: "Tangail Police Station", lat: 24.246834244716094, lng: 89.91335405390348},
+        { name: "Sudharam Model Police Station, Noakhali", lat: 22.872014478562495, lng: 91.0970440230188},
+        { name: "Jessore Police Station, Chowrasta", lat: 23.165719307626254, lng: 89.21386069993413},
+        { name: "Pabna Sadar Police Station", lat: 24.009040390462555, lng: 89.24010036965689},
+        { name: "Bogura Sadar Thana, Bogura", lat: 24.85072366965817, lng: 89.3729468003622},
+        { name: "Dinajpur Kotwali Police Station", lat: 25.63646908545274, lng: 88.63872878133385},
+        { name: "Faridpur Sadar Kotowali Thana", lat: 23.600570171134105, lng: 89.83447021012532},
+        { name: "Magura Police Station", lat: 23.491188930540957, lng: 89.42249889477945},
+        { name: "Narail Police Line", lat: 23.15930067079649, lng: 89.49426410714143},
+        { name: "Satkhira Police Station", lat: 22.7115591671022, lng: 89.07325428127133},
+        { name: "Chandpur Model Thana", lat: 23.224464573541663, lng: 90.65324602731232},
+        { name: "Lalmonirhat Sadar Police Station", lat: 25.916037850701887, lng: 89.44893690460542},
+        { name: "Meherpur Police Station", lat: 23.779318719417855, lng: 88.62580015430848},
+        { name: "Kushtia Police Station", lat: 23.908387027875012, lng: 89.12782844226233},
+        { name: "Bagerhat Sadar Police Station", lat: 22.661465174854598, lng: 89.79456464728229},
+        { name: "Patuakhali Sadar Police Station", lat: 22.36368294240366, lng: 90.34040614078744},
+        { name: "Sirajganj Sadar Police Station", lat: 24.458287699583764, lng: 89.70086354083061}, 
+        { name: "Madaripur Sadar Model Thana", lat: 23.167812464527575, lng: 90.20045939218541},
+        { name: "Sherpur Sadar Thana", lat: 25.012091540661338, lng: 90.0178193083045},
+        { name: "Jamalpur Police Station", lat: 24.939136376099185, lng: 89.93651783713872}
+
+        
+
+
+        
+
+
+        
+    ];
+
+    const CENTER_LAT = {{ center_lat|tojson }};
+    const CENTER_LNG = {{ center_lng|tojson }};
+    const resourcesMap = L.map('resourcesMap').setView([CENTER_LAT, CENTER_LNG], 12);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(resourcesMap);
+
+    POLICE_STATIONS.forEach(station => {
+        const marker = L.marker([station.lat, station.lng], {
+            icon: L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
+                shadowSize: [41, 41],
+                shadowAnchor: [12, 41]
+            })
+        }).addTo(resourcesMap);
+        marker.bindPopup(`<b>${station.name}</b>`);
+    });
+</script>
+
+
+{% endblock %}
