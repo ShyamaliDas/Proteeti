@@ -108,18 +108,6 @@ class SOSAlert(db.Model):
 
 
 
-class NotificationSubscription(db.Model):
-    __tablename__ = 'notification_subscriptions'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    endpoint = db.Column(db.String(2000), unique=True, nullable=False)
-    auth_key = db.Column(db.String(255), nullable=False)
-    p256dh_key = db.Column(db.String(255), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    is_active = db.Column(db.Boolean, default=True)
-
-    user = db.relationship('User', backref=db.backref('notification_subscriptions', lazy='dynamic', cascade='all, delete-orphan'))
 
 # ======= Admin Model (add to models/user.py) =======
 class Admin(db.Model):

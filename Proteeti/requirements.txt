@@ -11,3 +11,4 @@ flask-mail
 Werkzeug
 Flask-Migrate
 flask-cors
+psycopg2-binary

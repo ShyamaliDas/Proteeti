@@ -162,127 +162,28 @@ window.addEventListener('load', async () => {
         }
     </script>
 
-    <button id="toggle-notifications" class="btn btn-sm btn-outline-primary ms-2">
-        Enable Notifications
-    </button>
+    
 
-    <!-- {% if session.get('loggedin') %}
+    {% if session.get('loggedin') %}
         <button id="floatingSosBtn" class="floating-sos-button" aria-label="Send SOS" title="Send SOS" data-bs-toggle="tooltip">
             <i class="bi bi-exclamation-octagon-fill" aria-hidden="true"></i>
         </button>
-    {% endif %} -->
+    {% endif %}
 
-
-    <!-- <script>
-    // Only run this logic if the floating button exists (i.e., user is logged in)
-    const floatingSosBtn = document.getElementById('floatingSosBtn');
-
-    if (floatingSosBtn) {
-        floatingSosBtn.addEventListener('click', function() {
-            // Disable button during process
-            floatingSosBtn.disabled = true;
-            floatingSosBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
-
-            if ("geolocation" in navigator) {
-                navigator.geolocation.getCurrentPosition(
-                    async (position) => {
-                        const lat = position.coords.latitude;
-                        const lng = position.coords.longitude;
-
-                        try {
-                            const response = await fetch('/send_sos', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json'
-                                },
-                                body: JSON.stringify({ lat, lng })
-                            });
-
-                            const result = await response.json();
-
-                            if (response.ok) {
-                                alert('🚨 SOS Alert sent successfully to your trusted contacts!');
-                            } else {
-                                alert('SOS Error: ' + (result.error || 'Failed to send alert.'));
-                            }
-                        } catch (error) {
-                            alert('Network Error: Could not send SOS request.');
-                        } finally {
-                            // Re-enable and reset button
-                            floatingSosBtn.disabled = false;
-                            floatingSosBtn.innerHTML = '🚨';
-                        }
-                    },
-                    (error) => {
-                        // Re-enable and reset button on error
-                        floatingSosBtn.disabled = false;
-                        floatingSosBtn.innerHTML = '🚨';
-
-                        // Check specific error codes
-                        let errorMessage = "Could not get your location. Please ensure location services are enabled.";
-                        if (error.code === error.PERMISSION_DENIED) {
-                            errorMessage = "Location access denied. Please allow location access to use SOS.";
-                        }
-                        alert("SOS Failed: " + errorMessage);
-                    },
-                    { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-                );
-            } else {
-                // Browser doesn't support geolocation
-                alert("SOS Failed: Geolocation is not supported by your browser.");
-                floatingSosBtn.disabled = false;
-                floatingSosBtn.innerHTML = '🚨';
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const floatingSosBtn = document.getElementById('floatingSosBtn');
+            if (floatingSosBtn) {
+                if (window.bootstrap && bootstrap.Tooltip) {
+                    new bootstrap.Tooltip(floatingSosBtn);
+                }
+                floatingSosBtn.addEventListener('click', function () {
+                    window.location.href = '/sos';
+                });
             }
         });
-        document.addEventListener('DOMContentLoaded', function () {
-        const el = document.getElementById('floatingSosBtn');
-        if (el && window.bootstrap && bootstrap.Tooltip) {
-            new bootstrap.Tooltip(el); // enables the title="Send SOS" tooltip
-        }
-    });
-    }
-</script> -->
+    </script>
 
-<script src="{{ url_for('static', filename='js/notification-manager.js') }}"></script>
-
-<script>
-setTimeout(function() {
-  const button = document.getElementById('toggle-notifications');
-  if (!button) {
-    console.error('Button not found!');
-    return;
-  }
-  
-  console.log('Button found, attaching click handler');
-  
-  button.addEventListener('click', async function() {
-    console.log('Button clicked!');
-    try {
-      const isSubscribed = await window.notificationManager.getSubscriptionStatus();
-      console.log('Is subscribed:', isSubscribed);
-      
-      if (isSubscribed) {
-        await window.notificationManager.unsubscribeFromNotifications();
-        this.textContent = 'Enable Notifications';
-        this.classList.remove('btn-primary');
-        this.classList.add('btn-outline-primary');
-      } else {
-        const success = await window.notificationManager.subscribeToNotifications();
-        console.log('Subscribe result:', success);
-        if (success) {
-          this.textContent = 'Disable Notifications';
-          this.classList.remove('btn-outline-primary');
-          this.classList.add('btn-primary');
-        }
-      }
-    } catch (error) {
-      console.error('Error:', error);
-    }
-  });
-}, 500);
-
-
-</script>
 
 </body>
 </html>

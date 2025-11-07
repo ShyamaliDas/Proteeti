@@ -26,9 +26,6 @@ templates/login.html
 
             {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
 
-            <a href="{{ url_for('google.login') }}" class="btn btn-outline-danger w-100 mb-3">
-              Continue with Google
-            </a>
 
             <form method="POST" novalidate>
               <div class="mb-3">
