@@ -435,23 +435,23 @@
         </div>
         
         <div class="admin-nav">
-            <div class="admin-nav-item active" onclick="showAdminSection('overview')">
+            <div class="admin-nav-item active" onclick="showAdminSection('overview', event)">
                 <i class="bi bi-speedometer2 admin-nav-icon"></i>
                 <span>Overview</span>
             </div>
-            <div class="admin-nav-item" onclick="showAdminSection('sos')">
+            <div class="admin-nav-item" onclick="showAdminSection('sos', event)">
                 <i class="bi bi-exclamation-triangle-fill admin-nav-icon"></i>
                 <span>SOS Alerts</span>
             </div>
-            <div class="admin-nav-item" onclick="showAdminSection('reports')">
+            <div class="admin-nav-item" onclick="showAdminSection('reports', event)">
                 <i class="bi bi-flag-fill admin-nav-icon"></i>
                 <span>Hazard Reports</span>
             </div>
-            <div class="admin-nav-item" onclick="showAdminSection('users')">
+            <div class="admin-nav-item" onclick="showAdminSection('users', event)">
                 <i class="bi bi-people-fill admin-nav-icon"></i>
                 <span>Users</span>
             </div>
-            <div class="admin-nav-item" onclick="showAdminSection('analytics')">
+            <div class="admin-nav-item" onclick="showAdminSection('analytics', event)">
                 <i class="bi bi-graph-up admin-nav-icon"></i>
                 <span>Analytics</span>
             </div>
@@ -640,67 +640,80 @@
                     Activity Trends
                 </h3>
                 <div class="chart-container">
-                    Reports & SOS trends over time
+                    <canvas id="trendsChart" height="250"></canvas>
                 </div>
-            </div>
+                </div>
 
-            <div class="data-card">
-                <h3>
-                    <i class="bi bi-clock"></i>
-                    Peak Danger Hours
-                </h3>
-                <div class="chart-container">
-                    Hour-by-hour incident analysis
-                </div>
-            </div>
         </div>
     </div>
 </div>
+<!-- Charts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
 <script>
-function showAdminSection(sectionName) {
-    document.querySelectorAll('.admin-section').forEach(section => {
-        section.classList.remove('active');
-    });
-    
-    document.querySelectorAll('.admin-nav-item').forEach(item => {
-        item.classList.remove('active');
-    });
-    
-    document.getElementById('section-' + sectionName).classList.add('active');
-    event.currentTarget.classList.add('active');
+function showAdminSection(sectionName, evt) {
+  // hide all sections
+  document.querySelectorAll('.admin-section').forEach(section => {
+    section.classList.remove('active');
+  });
+
+  // deactivate all nav items
+  document.querySelectorAll('.admin-nav-item').forEach(item => {
+    item.classList.remove('active');
+  });
+
+  // show selected
+  const target = document.getElementById('section-' + sectionName);
+  if (target) target.classList.add('active');
+
+  // highlight clicked nav item (fallback if evt missing)
+  if (evt && evt.currentTarget) {
+    evt.currentTarget.classList.add('active');
+  } else {
+    const map = {
+      overview: 0, sos: 1, reports: 2, users: 3, analytics: 4
+    };
+    const items = document.querySelectorAll('.admin-nav .admin-nav-item');
+    if (items[map[sectionName]] ) items[map[sectionName]].classList.add('active');
+  }
+
+  // draw charts when entering analytics
+  if (sectionName === 'analytics') {
+    setTimeout(loadAnalyticsCharts, 0);
+  }
 }
 
 async function loadDashboardData() {
     try {
-        const sosResponse = await fetch('/api/admin/sos-alerts');
+        const [sosResponse, reportsResponse, usersResponse, analyticsResponse] = await Promise.all([
+            fetch('/api/admin/sos-alerts', { credentials: 'same-origin' }),
+            fetch('/api/reports', { credentials: 'same-origin' }),
+            fetch('/api/admin/users', { credentials: 'same-origin' }),
+            fetch('/api/admin/analytics/overview', { credentials: 'same-origin' })
+        ]);
+        
         const sosData = await sosResponse.json();
-        
-        const reportsResponse = await fetch('/api/reports');
         const reportsData = await reportsResponse.json();
-        
-        const usersResponse = await fetch('/api/admin/users');
         const usersData = await usersResponse.json();
+        const analyticsData = await analyticsResponse.json();
         
-        updateStats(sosData, reportsData, usersData);
+        updateStats(analyticsData);
         populateSOSTable(sosData);
         populateReportsTable(reportsData);
         populateUsersTable(usersData);
-        populateCategoryBreakdown(reportsData);
+        populateCategoryBreakdown(analyticsData.categories);
+        loadHeatmapData();
         
     } catch (error) {
         console.error('Error loading dashboard data:', error);
     }
 }
 
-function updateStats(sosData, reportsData, usersData) {
-    const activeSOS = sosData.filter(s => s.status === 'active').length;
-    document.getElementById('stat-sos-total').textContent = activeSOS;
-    document.getElementById('stat-users-total').textContent = usersData.length;
-    document.getElementById('stat-reports-total').textContent = reportsData.length;
-    
-    const verified = usersData.filter(u => u.verified).length;
-    document.getElementById('stat-verified').textContent = verified;
+function updateStats(data) {
+    document.getElementById('stat-sos-total').textContent = data.active_sos || 0;
+    document.getElementById('stat-users-total').textContent = data.total_users || 0;
+    document.getElementById('stat-reports-total').textContent = data.total_reports || 0;
+    document.getElementById('stat-verified').textContent = data.verified_users || 0;
 }
 
 function populateSOSTable(sosData) {
@@ -813,35 +826,195 @@ function populateUsersTable(usersData) {
     `).join('');
 }
 
-function populateCategoryBreakdown(reportsData) {
+function populateCategoryBreakdown(categories) {
     const container = document.getElementById('category-breakdown');
     
-    if (!reportsData || reportsData.length === 0) {
+    if (!categories || categories.length === 0) {
         container.innerHTML = '<div class="empty-state">No reports to analyze</div>';
         return;
     }
     
-    const categories = {};
-    reportsData.forEach(report => {
-        categories[report.category] = (categories[report.category] || 0) + 1;
-    });
+    const maxCount = Math.max(...categories.map(c => c.count));
     
-    const maxCount = Math.max(...Object.values(categories));
-    
-    container.innerHTML = Object.entries(categories)
-        .sort((a, b) => b[1] - a[1])
-        .map(([category, count]) => `
+    container.innerHTML = categories
+        .sort((a, b) => b.count - a.count)
+        .map(cat => `
             <div class="category-bar">
-                <div class="category-name">${category}</div>
+                <div class="category-name">${cat.category}</div>
                 <div class="category-progress">
-                    <div class="category-fill" style="width: ${(count / maxCount) * 100}%"></div>
+                    <div class="category-fill" style="width: ${(cat.count / maxCount) * 100}%"></div>
                 </div>
-                <div class="category-count">${count}</div>
+                <div class="category-count">${cat.count}</div>
             </div>
         `).join('');
 }
 
+// NEW: Load heatmap data
+async function loadHeatmapData() {
+    try {
+        const response = await fetch('/api/admin/analytics/heatmap-data', { credentials: 'same-origin' });
+        const data = await response.json();
+        
+        if (data.points && data.points.length > 0) {
+            renderHeatmap(data.points);
+        }
+    } catch (error) {
+        console.error('Error loading heatmap:', error);
+    }
+}
+
+// NEW: Render heatmap using simple visualization
+function renderHeatmap(points) {
+    const container = document.querySelector('#section-overview .chart-container');
+    if (!container) return;
+    
+    // Calculate center point
+    const avgLat = points.reduce((sum, p) => sum + p.lat, 0) / points.length;
+    const avgLng = points.reduce((sum, p) => sum + p.lng, 0) / points.length;
+    
+    container.innerHTML = `
+        <div style="padding: 20px; text-align: center;">
+            <div style="font-size: 48px; color: var(--bloody-mary); margin-bottom: 10px;">
+                <i class="bi bi-geo-alt-fill"></i>
+            </div>
+            <h3 style="color: var(--bordeaux); margin-bottom: 10px;">${points.length} Locations Tracked</h3>
+            <p style="color: var(--purple-tulip);">
+                ${points.filter(p => p.type === 'sos').length} SOS Alerts · 
+                ${points.filter(p => p.type === 'report').length} Reports
+            </p>
+            <button class="action-btn btn-view" onclick="window.open('/map', '_blank')" style="margin-top: 15px;">
+                <i class="bi bi-map"></i> View Full Map
+            </button>
+        </div>
+    `;
+}
+
+// NEW: Load analytics charts
+async function loadAnalyticsCharts() {
+    try {
+        const trendsResponse = await fetch('/api/admin/analytics/trends', { credentials: 'same-origin' });
+        const trendsData = await trendsResponse.json();
+        if (trendsResponse.status === 401) {
+            console.error('Admin session missing; cannot load analytics.');
+            alert('Please log in as admin to view analytics.');
+            return;
+        }
+
+        renderTrendsChart(trendsData);
+                
+    } catch (error) {
+        console.error('Error loading analytics:', error);
+    }
+}
+
+// NEW: Render trends chart
+function renderTrendsChart(data) {
+    const container = document.querySelector('#section-analytics .chart-container');
+    if (!container) return;
+    
+    const totalReports = data.reports.reduce((sum, d) => sum + d.count, 0);
+    const totalSOS = data.sos.reduce((sum, d) => sum + d.count, 0);
+    
+    container.innerHTML = `
+        <div style="padding: 30px; text-align: center;">
+            <h3 style="color: var(--bordeaux); margin-bottom: 30px;">Last 7 Days Activity</h3>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px; max-width: 500px; margin: 0 auto;">
+                <div>
+                    <div style="font-size: 48px; color: var(--furious-tiger); margin-bottom: 10px;">
+                        ${totalReports}
+                    </div>
+                    <div style="color: var(--purple-tulip); font-weight: 600;">Reports Filed</div>
+                </div>
+                <div>
+                    <div style="font-size: 48px; color: var(--bloody-mary); margin-bottom: 10px;">
+                        ${totalSOS}
+                    </div>
+                    <div style="color: var(--purple-tulip); font-weight: 600;">SOS Alerts</div>
+                </div>
+            </div>
+            <div style="margin-top: 30px; padding: 15px; background: rgba(123, 0, 44, 0.05); border-radius: 10px;">
+                <small style="color: var(--purple-tulip);">
+                    ${totalReports > 0 || totalSOS > 0 ? 
+                        '📈 Community is actively reporting safety concerns' : 
+                        '📊 No recent activity - system is quiet'}
+                </small>
+            </div>
+        </div>
+    `;
+}
+
+function lastNDatesISO(n) {
+  const today = new Date();
+  const days = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    days.push(d.toISOString().slice(0,10));
+  }
+  return days;
+}
+
+// Keep chart instances so we can update cleanly on tab switches
+let _trendsChart;
+
+// === Activity Trends: line chart for last 7 days (reports & SOS) ===
+function renderTrendsChart(data) {
+  const ctx = document.getElementById('trendsChart');
+  if (!ctx) return;
+
+  const labels = lastNDatesISO(7);
+
+  // Map API arrays into a date=>count dictionary
+  const repMap = Object.fromEntries((data.reports || []).map(d => [d.date, d.count]));
+  const sosMap = Object.fromEntries((data.sos || []).map(d => [d.date, d.count]));
+
+  const reports = labels.map(d => repMap[d] || 0);
+  const sos = labels.map(d => sosMap[d] || 0);
+
+  // Destroy previous instance if any (prevents overlay when switching tabs)
+  if (_trendsChart) { _trendsChart.destroy(); }
+
+  _trendsChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Reports',
+          data: reports,
+          tension: 0.35,
+          fill: false,
+          borderWidth: 2,       // NOTE: we do not set explicit colors per instructions
+          pointRadius: 3
+        },
+        {
+          label: 'SOS',
+          data: sos,
+          tension: 0.35,
+          fill: false,
+          borderWidth: 2,
+          pointRadius: 3
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { ticks: { callback: (v, i) => labels[i]?.slice(5) } }, // show MM-DD
+        y: { beginAtZero: true, precision: 0 }
+      },
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: { callbacks: { title: items => items[0].label } }
+      }
+    }
+  });
+}
+
 function formatTime(timestamp) {
+    if (!timestamp) return 'N/A';
     const date = new Date(timestamp);
     const now = new Date();
     const diff = now - date;
@@ -862,9 +1035,9 @@ async function resolveAlert(alertId) {
     
     try {
         const response = await fetch(`/api/admin/sos-alerts/${alertId}/resolve`, {
-            method: 'POST'
+            method: 'POST',
+            credentials: 'same-origin'
         });
-        
         if (response.ok) {
             alert('Alert marked as resolved');
             loadDashboardData();
@@ -879,9 +1052,9 @@ async function deleteReport(reportId) {
     
     try {
         const response = await fetch(`/api/admin/reports/${reportId}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            credentials: 'same-origin'
         });
-        
         if (response.ok) {
             alert('Report deleted');
             loadDashboardData();
@@ -891,6 +1064,7 @@ async function deleteReport(reportId) {
     }
 }
 
+// Load data when page loads
 document.addEventListener('DOMContentLoaded', loadDashboardData);
 </script>
 

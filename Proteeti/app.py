@@ -1094,8 +1094,123 @@ def delete_own_admin_account():
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+    
+@app.route("/api/admin/analytics/overview")
+def get_analytics_overview():
+    """Get overview analytics for admin dashboard"""
+    check = require_admin_api()
+    if check: return check
+    
+    try:
+        from datetime import timedelta
+        from sqlalchemy import func
+        
+        now = datetime.utcnow()
+        week_ago = now - timedelta(days=7)
+        
+        # Count stats
+        total_users = User.query.count()
+        verified_users = User.query.filter_by(verified=True).count()
+        total_reports = Report.query.count()
+        active_sos = SOSAlert.query.filter_by(status='active').count()
+        
+        # Recent activity (last 7 days)
+        recent_reports = Report.query.filter(Report.timestamp >= week_ago).count()
+        recent_users = User.query.filter(User.created_at >= week_ago).count()
+        
+        # Reports by category
+        category_counts = db.session.query(
+            Report.category, 
+            func.count(Report.id)
+        ).group_by(Report.category).all()
+        
+        categories = [{"category": cat, "count": count} for cat, count in category_counts]
+        
+        return jsonify({
+            "total_users": total_users,
+            "verified_users": verified_users,
+            "total_reports": total_reports,
+            "active_sos": active_sos,
+            "recent_reports": recent_reports,
+            "recent_users": recent_users,
+            "categories": categories
+        }), 200
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@app.route("/api/admin/analytics/trends")
+def get_trends():
+    """Get 7-day trends for reports and SOS"""
+    check = require_admin_api()
+    if check: return check
+    
+    try:
+        from datetime import timedelta
+        from sqlalchemy import func, cast, Date
+        
+        now = datetime.utcnow()
+        week_ago = now - timedelta(days=7)
+        
+        # Reports by day (last 7 days)
+        report_trends = db.session.query(
+            cast(Report.timestamp, Date).label('date'),
+            func.count(Report.id).label('count')
+        ).filter(Report.timestamp >= week_ago).group_by('date').all()
+        
+        # SOS by day (last 7 days)
+        sos_trends = db.session.query(
+            cast(SOSAlert.created_at, Date).label('date'),
+            func.count(SOSAlert.id).label('count')
+        ).filter(SOSAlert.created_at >= week_ago).group_by('date').all()
+        
+        # Format data
+        report_data = [{"date": str(date), "count": count} for date, count in report_trends]
+        sos_data = [{"date": str(date), "count": count} for date, count in sos_trends]
+        
+        return jsonify({
+            "reports": report_data,
+            "sos": sos_data
+        }), 200
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-
+@app.route("/api/admin/analytics/heatmap-data")
+def get_heatmap_data():
+    """Get location data for heatmap"""
+    check = require_admin_api()
+    if check: return check
+    
+    try:
+        # Get all reports with coordinates
+        reports = Report.query.with_entities(Report.lat, Report.lng, Report.category).all()
+        sos_alerts = SOSAlert.query.with_entities(SOSAlert.lat, SOSAlert.lng).all()
+        
+        heatmap_points = []
+        
+        # Add reports (intensity 1)
+        for lat, lng, category in reports:
+            heatmap_points.append({
+                "lat": float(lat),
+                "lng": float(lng),
+                "intensity": 1,
+                "type": "report"
+            })
+        
+        # Add SOS alerts (intensity 3 - more critical)
+        for lat, lng in sos_alerts:
+            heatmap_points.append({
+                "lat": float(lat),
+                "lng": float(lng),
+                "intensity": 3,
+                "type": "sos"
+            })
+        
+        return jsonify({"points": heatmap_points}), 200
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
