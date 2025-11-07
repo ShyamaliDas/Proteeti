@@ -162,6 +162,152 @@ window.addEventListener('load', async () => {
         }
     </script>
 
+
+ {% if session.get('loggedin') %}
+  <div class="rate-us-bar">
+    <button id="floatingRateBtn" aria-label="Rate Us" title="Rate Us" type="button" style="
+  position: fixed; bottom: 30px; left: 30px; z-index: 9999;
+  background: #8b0606; color: white; border: none; border-radius: 50%; width: 60px; height: 60px;
+  box-shadow: 0 4px 15px rgba(123,0,44,0.2); font-size: 1.8rem;
+  display: flex; justify-content: center; align-items: center; cursor: pointer;">
+  <i class="bi bi-star-fill" aria-hidden="true"></i>
+</button>
+
+  </div>
+  <div id="rateModal" style="
+    display: none;
+    position: fixed;
+    bottom: 100px;
+    left: 60px;
+    z-index: 10000;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 30px rgba(123,0,44,0.4);
+    padding: 1rem;
+    min-width: 220px;
+    text-align:center;
+    ">
+  </div>
+{% endif %}
+
+
+<div id="customRateModal" style="
+  display: none; position: fixed; bottom: 100px; left: 60px; z-index: 10000;
+  background: white; border-radius: 12px; box-shadow: 0 4px 30px rgba(123,0,44,0.4);
+  padding: 1.2rem 1.2rem 0.7rem 1.2rem; min-width: 220px; text-align: center;">
+  <div id="customRateContent">
+    <div style="font-weight:600; color:#8b0606; font-size:1.2rem;">Rate Us</div>
+    <div id="starOptions" style="margin:1rem 0;"></div>
+    <div style="margin-bottom:0.5rem;"></div>
+    <button id="customRateSubmit" class="btn btn-primary btn-sm" style="padding:0.2rem 1.2rem; border-radius:6px; background:#8b0606; border:none;">Submit</button>
+    <button id="customRateCancel" class="btn btn-secondary btn-sm" style="padding:0.2rem 0.8rem; border-radius:6px; margin-left:8px;">Cancel</button>
+  </div>
+  <div id="thanksMsg" style="display:none;font-size:1.05rem;padding:13px 0 2px 0;color:#8b0606;font-weight:500;">Thank you for rating us!</div>
+</div>
+
+
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const floatingRateBtn = document.getElementById('floatingRateBtn');
+  const rateModal = document.getElementById('customRateModal');
+  const starOptions = document.getElementById('starOptions');
+  const rateSubmit = document.getElementById('customRateSubmit');
+  const rateCancel = document.getElementById('customRateCancel');
+  const thanksMsg = document.getElementById('thanksMsg');
+  const modalContent = document.getElementById('customRateContent');
+  let selectedRating = 0;
+
+  // Make 5 clickable stars
+  starOptions.innerHTML = '';
+  for (let i = 1; i <= 5; i++) {
+    const star = document.createElement('span');
+    star.setAttribute('data-value', i);
+    star.style.fontSize = '2rem';
+    star.style.color = '#bbb';
+    star.style.cursor = 'pointer';
+    star.style.transition = 'color 0.2s';
+    star.innerHTML = '★';
+    starOptions.appendChild(star);
+  }
+  // Star interactions
+  starOptions.addEventListener('mouseover', function(e) {
+    if (e.target.tagName === 'SPAN') {
+      let val = parseInt(e.target.dataset.value);
+      Array.from(starOptions.children).forEach((star, idx) => {
+        star.style.color = idx < val ? '#8b0606' : '#bbb';
+      });
+    }
+  });
+  starOptions.addEventListener('mouseout', function() {
+    Array.from(starOptions.children).forEach((star, idx) => {
+      star.style.color = idx < selectedRating ? '#8b0606' : '#bbb';
+    });
+  });
+  starOptions.addEventListener('click', function(e) {
+    if (e.target.tagName === 'SPAN') {
+      selectedRating = parseInt(e.target.dataset.value);
+      Array.from(starOptions.children).forEach((star, idx) => {
+        star.style.color = idx < selectedRating ? '#8b0606' : '#bbb';
+      });
+    }
+  });
+
+  // Open modal
+  floatingRateBtn.addEventListener('click', function() {
+    rateModal.style.display = 'block';
+    thanksMsg.style.display = 'none';
+    modalContent.style.display = 'block';
+    // Reset selection
+    selectedRating = 0;
+    Array.from(starOptions.children).forEach(star => star.style.color = '#bbb');
+  });
+  // Cancel closes
+  rateCancel.addEventListener('click', function() {
+    rateModal.style.display = 'none';
+    selectedRating = 0;
+    Array.from(starOptions.children).forEach(star => star.style.color = '#bbb');
+  });
+  // Submit rating
+  rateSubmit.addEventListener('click', function(e) {
+    e.preventDefault();
+    if (!selectedRating) {
+      // show error inside modal (optional)
+      rateSubmit.textContent = 'Please pick a rating!';
+      setTimeout(() => rateSubmit.textContent = 'Submit', 900);
+      return;
+    }
+    rateSubmit.disabled = true;
+    fetch('/rate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({rating: selectedRating})
+    }).then(res => res.json())
+    .then(data => {
+      modalContent.style.display = 'none';
+      thanksMsg.style.display = 'block';
+      setTimeout(() => {
+        rateModal.style.display = 'none';
+        thanksMsg.style.display = 'none';
+        modalContent.style.display = 'block';
+        rateSubmit.disabled = false;
+        // Reset stars again
+        selectedRating = 0;
+        Array.from(starOptions.children).forEach(star => star.style.color = '#bbb');
+      }, 1200);
+    })
+    .catch(() => {
+      rateSubmit.textContent = 'Error, try again';
+      setTimeout(() => rateSubmit.textContent = 'Submit', 1000);
+      rateSubmit.disabled = false;
+    });
+  });
+});
+</script>
+
+
+
     
 
     {% if session.get('loggedin') %}

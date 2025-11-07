@@ -10,7 +10,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
 from config.database import Config
-from models.user import db, User, Report, SOSAlert
+from models.user import db, User, Report, SOSAlert, Admin, StarRating
 import base64
 import hashlib
 import hmac
@@ -1211,6 +1211,29 @@ def get_heatmap_data():
     
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+
+
+
+@app.route('/rate', methods=['POST'])
+def rate():
+    if not session.get('loggedin'):
+        return jsonify({'message': 'You must be logged in.'}), 401
+    data = request.get_json(force=True)
+    rating = int(data.get('rating', 0))
+    username = session.get('username')
+    if rating < 1 or rating > 5:
+        return jsonify({'message': 'Invalid rating.'}), 400
+    existing = StarRating.query.filter_by(username=username).first()
+    if existing:
+        existing.rating = rating
+        existing.rated_at = datetime.now()
+    else:
+        sr = StarRating(username=username, rating=rating)
+        db.session.add(sr)
+    db.session.commit()
+    return jsonify({'message': f'Your rating ({rating} stars) has been saved.'}), 200
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

@@ -15,7 +15,7 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=True)  
     verified = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now, index=True)
     
     # Store profile and trusted_contacts as JSON
     profile = db.Column(db.JSON, default=dict)
@@ -64,7 +64,7 @@ class Report(db.Model):
     lng = db.Column(db.Float, nullable=False)
     category = db.Column(db.String(50), nullable=False)
     description = db.Column(db.Text)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=datetime.now, index=True)
     
     user = db.relationship('User', backref='reports')
     
@@ -115,7 +115,7 @@ class Admin(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now, index=True)
     
     def set_password(self, password):
         from werkzeug.security import generate_password_hash
@@ -124,3 +124,12 @@ class Admin(db.Model):
     def check_password(self, password):
         from werkzeug.security import check_password_hash
         return check_password_hash(self.password_hash, password)
+
+
+
+class StarRating(db.Model):
+    __tablename__ = "star_ratings"
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), db.ForeignKey('users.username'), nullable=False, index=True)
+    rating = db.Column(db.Integer, nullable=False)
+    rated_at = db.Column(db.DateTime, default=datetime.now, index=True)
