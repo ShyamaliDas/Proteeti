@@ -1,34 +1,33 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="auth-split-container">
-  <div class="auth-card-wrapper">
-    <div class="row g-0">
-      <!-- Art / Illustration (LEFT) -->
-      <div class="col-lg-6 d-none d-lg-block login-art-panel position-relative">
-        <span class="auth-bubble big" style="left:12%;top:18%"></span>
-        <span class="auth-bubble med" style="left:22%;top:50%"></span>
-        <span class="auth-bubble sm"  style="left:8%; top:72%"></span>
-      </div>
+<div class="container-fluid d-flex justify-content-center align-items-center min-vh-100 py-5">
+  <div class="row justify-content-center w-100">
+    <div class="col-12 col-md-8 col-lg-6 col-xl-5">
+      <div class="card shadow-lg border-0">
+        <div class="card-body p-4 p-md-5">
+          <div class="text-center mb-4">
+            <h1 class="h3 fw-bold mb-2" style="color:var(--bordeaux);">Complete your profile</h1>
+            <p class="text-muted">Just a few details to personalize alerts and contacts.</p>
+          </div>
 
-      <!-- Form (RIGHT) -->
-      <div class="col-12 col-lg-6 bg-transparent auth-form-col">
-        <div class="login-form-blob w-100">
-          <div class="auth-card-inner">
-            <h1 class="mb-1" style="color:var(--bordeaux);font-weight:700; text-align: center;">Complete your profile</h1>
-            <p class="text-muted mb-3" align>Just a few details to personalize alerts and contacts.</p>
+          {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
 
-            {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
-
-            <form method="post" novalidate id="onboardingForm">
-              <input type="hidden" name="country_name" id="countryName">
+          <form method="post" novalidate id="onboardingForm">
+            <input type="hidden" name="country_name" id="countryName">
+            
+            <!-- Personal Information -->
+            <div class="mb-4">
+              <h6 class="fw-semibold mb-3 text-muted">PERSONAL INFORMATION</h6>
+              
               <div class="row g-3">
-                <div class="col-md-6">
+                <div class="col-12">
                   <label class="form-label">Full name *</label>
-                  <input class="form-control" name="full_name" value="{{ full_name or '' }}" required>
+                  <input class="form-control form-control-lg" name="full_name" value="{{ full_name or '' }}" required>
                 </div>
-                <div class="col-md-6">
+                
+                <div class="col-12">
                   <label class="form-label">Mobile phone *</label>
-                  <div class="input-group">
+                  <div class="input-group input-group-lg">
                     <select class="form-select" id="countryCode" name="country_code" style="max-width: 140px;" required>
                       <option value="">Code</option>
                     </select>
@@ -36,19 +35,21 @@
                   </div>
                 </div>
 
-                <div class="col-md-4">
+                <div class="col-12 col-md-6">
                   <label class="form-label">Country *</label>
                   <select class="form-select" name="country" id="countrySelect" required>
                     <option value="">Loading countries...</option>
                   </select>
                 </div>
-                <div class="col-md-4">
+                
+                <div class="col-12 col-md-6">
                   <label class="form-label">City *</label>
                   <select class="form-select" name="city" id="citySelect" required>
                     <option value="">Select country first</option>
                   </select>
                 </div>
-                <div class="col-md-2">
+                
+                <div class="col-12 col-md-6">
                   <label class="form-label">Language</label>
                   <select class="form-select" name="language" id="languageSelect" required>
                     <option value="en">English</option>
@@ -58,43 +59,52 @@
                     <option value="bn">Bengali</option>
                   </select>
                 </div>
-                <div class="col-md-2">
+                
+                <div class="col-12 col-md-6">
                   <label class="form-label">Timezone</label>
                   <select class="form-select" name="timezone" id="timezoneSelect" required>
                     <option value="UTC">Loading...</option>
                   </select>
                 </div>
+              </div>
+            </div>
 
-                <div class="col-12"><hr></div>
-
-                <div class="col-12">
-                  <h5 class="mb-2">Trusted contact (required)</h5>
-                </div>
-                <div class="col-md-5">
+            <!-- Trusted Contact -->
+            <div class="mb-4">
+              <h6 class="fw-semibold mb-3 text-muted">TRUSTED CONTACT</h6>
+              
+              <div class="row g-3">
+                <div class="col-12 col-md-6">
                   <label class="form-label">Name *</label>
                   <input class="form-control" name="tc_name" required>
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label">Email *</label>
-                    <input type="email" class="form-control" name="tc_email" required>
+                
+                <div class="col-12 col-md-6">
+                  <label class="form-label">Email *</label>
+                  <input type="email" class="form-control" name="tc_email" required>
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label">Phone Number</label>
-                    <input type="tel" class="form-control" name="tc_phone">
+                
+                <div class="col-12 col-md-6">
+                  <label class="form-label">Phone Number</label>
+                  <input type="tel" class="form-control" name="tc_phone">
                 </div>
-                <div class="col-md-3">
+                
+                <div class="col-12 col-md-6">
                   <label class="form-label">Relation</label>
-                  <input class="form-control" name="tc_relation">
-                </div>
-
-                <div class="col-12 mt-2">
-                  <button type="submit" class="btn btn-danger w-100 btn-lg">Save & Continue</button>
+                  <input class="form-control" name="tc_relation" placeholder="e.g., Family, Friend">
                 </div>
               </div>
-            </form>
+            </div>
 
-            <p class="text-center text-muted small mb-0 mt-2">You can edit these later in Account → Profile & Contacts.</p>
-          </div>
+            <!-- Submit Button -->
+            <div class="d-grid mt-4">
+              <button type="submit" class="btn btn-danger btn-lg py-3 fw-semibold">Save & Continue</button>
+            </div>
+          </form>
+
+          <p class="text-center text-muted small mt-3 mb-0">
+            You can edit these later in Account → Profile & Contacts.
+          </p>
         </div>
       </div>
     </div>
@@ -139,7 +149,7 @@ class OnboardingForm {
       countries.forEach(country => {
         // Add to country dropdown
         const option = document.createElement('option');
-        option.value = country.cca2; // Country code (US, BD, IN, etc.)
+        option.value = country.cca2;
         option.textContent = country.name.common;
         option.setAttribute('data-timezones', JSON.stringify(country.timezones));
         
@@ -189,7 +199,7 @@ class OnboardingForm {
   // Load timezones from WorldTimeAPI
   async loadTimezones() {
     try {
-      const response = await fetch('http://worldtimeapi.org/api/timezone');
+      const response = await fetch('https://worldtimeapi.org/api/timezone');
       const timezones = await response.json();
       
       this.timezoneSelect.innerHTML = '<option value="">Select Timezone</option>';
@@ -220,22 +230,17 @@ class OnboardingForm {
     });
   }
 
-  // Load cities for selected country using Geonames (free tier)
+  // Load cities for selected country
   async loadCities(countryCode) {
     this.citySelect.innerHTML = '<option value="">Loading cities...</option>';
     
     try {
-      // Using a free cities API (example with simple dataset)
-      // For production, you might want to use Geonames with username (free)
-      const response = await fetch(`https://api.api-ninjas.com/v1/city?country=${countryCode}&limit=30`, {
-        headers: { 'X-Api-Key': '' } // Free tier doesn't need key for small usage
-      });
+      const response = await fetch(`https://api.api-ninjas.com/v1/city?country=${countryCode}&limit=30`);
       
       let cities = [];
       if (response.ok) {
         cities = await response.json();
       } else {
-        // Fallback to predefined cities
         cities = this.getFallbackCities(countryCode);
       }
       
@@ -266,25 +271,21 @@ class OnboardingForm {
     return cityMap[countryCode] || ['Capital City'];
   }
 
-setupEventListeners() {
+  setupEventListeners() {
     // Country change event
     this.countrySelect.addEventListener('change', (e) => {
       const selectedOption = e.target.options[e.target.selectedIndex];
       const countryCode = e.target.value;
-      const countryName = selectedOption.textContent; // ADD THIS LINE
+      const countryName = selectedOption.textContent;
       
-      // Update the hidden country name field - ADD THESE 2 LINES
       document.getElementById('countryName').value = countryName;
       
       if (countryCode) {
-        // Update country code
         const callingCode = selectedOption.getAttribute('data-calling-code');
         this.countryCodeSelect.value = callingCode;
         
-        // Load cities for this country
         this.loadCities(countryCode);
         
-        // Update timezone based on country
         const timezones = JSON.parse(selectedOption.getAttribute('data-timezones') || '[]');
         if (timezones.length > 0 && this.timezoneSelect.querySelector(`option[value="${timezones[0]}"]`)) {
           this.timezoneSelect.value = timezones[0];
@@ -292,22 +293,20 @@ setupEventListeners() {
       }
     });
 
-    // Country code change event (sync with country)
+    // Country code change event
     this.countryCodeSelect.addEventListener('change', (e) => {
       const selectedCountry = e.target.options[e.target.selectedIndex].getAttribute('data-country');
       if (selectedCountry) {
         this.countrySelect.value = selectedCountry;
-        // Trigger change event to load cities
         this.countrySelect.dispatchEvent(new Event('change'));
       }
     });
 
-    // Form submission - combine country code with phone number
+    // Form submission
     document.getElementById('onboardingForm').addEventListener('submit', (e) => {
       const countryCode = this.countryCodeSelect.value;
       const phoneInput = document.querySelector('input[name="phone"]');
       
-      // Prepend country code to phone number if not already there
       if (countryCode && phoneInput.value && !phoneInput.value.startsWith(countryCode)) {
         phoneInput.value = countryCode + phoneInput.value;
       }
