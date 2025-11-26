@@ -1,7 +1,7 @@
 
 {% extends "base.html" %}
 {% block content %}
-<div class="container" id="mapContainer" data-loggedin="{{ session.get('loggedin')|tojson }}">
+<div class="container" id="mapContainer" data-loggedin="{{ session.get('loggedin')|tojson }}" data-center-lat="{{ center_lat|tojson }}" data-center-lng="{{ center_lng|tojson }}">
    
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 class="mb-0">Community Safety Map</h2>
@@ -51,9 +51,10 @@
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
-    const CENTER_LAT = {{ center_lat|tojson }};
-    const CENTER_LNG = {{ center_lng|tojson }};
-    const map = L.map('map').setView([CENTER_LAT, CENTER_LNG], 13);
+    const mapContainer = document.getElementById('mapContainer');
+    const CENTER_LAT = parseFloat(mapContainer.dataset.centerLat);
+    const CENTER_LNG = parseFloat(mapContainer.dataset.centerLng);
+    const map = L.map('map').setView([isNaN(CENTER_LAT) ? 0 : CENTER_LAT, isNaN(CENTER_LNG) ? 0 : CENTER_LNG], 13);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
 
@@ -133,6 +134,67 @@
     }    
 
     loadSosAlerts();
+
+    // Load SOS alerts from your Proteeti network
+    async function loadNetworkSOS() {
+        try {
+            const response = await fetch('/api/network_sos');
+            const sosAlerts = await response.json();
+            
+            sosAlerts.forEach(alert => {
+                // Create pulsating SOS marker for network alerts
+                const sosMarker = L.marker([alert.lat, alert.lng], {
+                    icon: L.icon({
+                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+                        iconSize: [30, 46],
+                        iconAnchor: [15, 46],
+                        popupAnchor: [1, -34],
+                    })
+                }).addTo(map);
+                
+                sosMarker.bindPopup(`
+                    <div style="min-width: 220px;">
+                        <h6 class="text-danger mb-2">🚨 ${alert.username} needs help!</h6>
+                        <p class="mb-1"><strong>Time:</strong> ${new Date(alert.created_at).toLocaleString()}</p>
+                        <p class="mb-1"><strong>Status:</strong> <span class="text-danger">ACTIVE SOS</span></p>
+                        <small class="text-muted">From your safety network</small>
+                        <div class="mt-2">
+                            <button class="btn btn-sm btn-outline-danger w-100" 
+                                    onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${alert.lat},${alert.lng}&travelmode=driving', '_blank')">
+                                Navigate to Location
+                            </button>
+                        </div>
+                    </div>
+                `);
+                
+                // Make marker pulse for attention
+                const markerElement = sosMarker.getElement();
+                if (markerElement) {
+                    markerElement.style.animation = 'pulse 2s infinite';
+                }
+            });
+            
+            if (sosAlerts.length > 0) {
+                console.log(`🚨 Loaded ${sosAlerts.length} active SOS alerts from your network`);
+            }
+        } catch (error) {
+            console.log('No active SOS alerts from your network');
+        }
+    }
+
+    // Add CSS for pulsing animation
+    const pulseStyle = document.createElement('style');
+    pulseStyle.textContent = `
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    `;
+    document.head.appendChild(pulseStyle);
+
+    // Call this function after your existing loadSosAlerts()
+    loadNetworkSOS();
 
     document.getElementById('reportForm')?.addEventListener('submit', async function(e) {
         e.preventDefault();

@@ -25,6 +25,13 @@
       <a href="{{ url_for('account') }}" class="btn btn-secondary">Cancel</a>
       <button type="submit" class="btn btn-success">Save &amp; Update</button>
     </div>
+    <hr>
+    <h5>Add New Non-App Trusted Contact (optional)</h5>
+    <div class="mb-3"><label>Name</label><input type="text" name="tc_name" class="form-control"></div>
+    <div class="mb-3"><label>Email</label><input type="email" name="tc_email" class="form-control"></div>
+    <div class="mb-3"><label>Phone</label><input type="tel" name="tc_phone" class="form-control"></div>
+    <div class="mb-3"><label>Relation</label><input type="text" name="tc_relation" class="form-control" placeholder="e.g., Family"></div>
+    <hr>
   </form>
 </div>
 {% endblock %}

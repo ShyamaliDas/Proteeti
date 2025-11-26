@@ -30,6 +30,7 @@
                     <li class="nav-item"><a class="nav-link" href="/resources">Resources</a></li>
                     
                     {% if session.get('loggedin') %}
+                        <li class="nav-item"><a class="nav-link" href="/network">Network</a></li>
                         <li class="nav-item"><a class="nav-link" href="/account">{{ session.get('username') }}</a></li>
                         <li class="nav-item"><a class="nav-link" href="/logout">Logout</a></li>
                     {% else %}

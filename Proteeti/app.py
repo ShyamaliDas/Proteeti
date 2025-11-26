@@ -8,9 +8,10 @@ import json, os, re, random, requests, smtplib
 from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
 from dotenv import load_dotenv
 from config.database import Config
-from models.user import db, User, Report, SOSAlert, Admin, StarRating
+from models.user import db, User, Report, SOSAlert, Admin, StarRating, NetworkConnection
 import base64
 import hashlib
 import hmac
@@ -22,6 +23,10 @@ os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 app = Flask(__name__)
 app.config.from_object(Config)
+
+# Provide a consistent "now" helper used across the code (bd_now was referenced but not defined)
+def bd_now():
+    return datetime.utcnow()
 
 
 
@@ -117,111 +122,190 @@ def send_verification_code(email, code):
 
 
 def send_sos_email_with_location(user, latitude, longitude):
-    """Send immediate SOS email with live location (no attachment)"""
-    if not user.trusted_contacts:
-        print(f"[DEBUG] No trusted contacts found for {user.username}")
-        return False
-    
+    """Send immediate SOS email with live location to BOTH network + legacy contacts"""
     GMAIL_SENDER = os.getenv("GMAIL_SENDER")
     GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
     
     if not GMAIL_SENDER or not GMAIL_APP_PASSWORD:
-        print("[DEBUG] Gmail credentials not configured!")
+        print("[ERROR] Gmail credentials not configured!")
         return False
-    
+
     maps_link = f"https://www.google.com/maps?q={latitude},{longitude}"
-    
-    for contact in user.trusted_contacts:
+    sent_to_anyone = False
+
+    # === 1. Send to Network Connections (mutual app users) ===
+    for contact in user.trusted_contacts:  # This is your property → returns accepted connections
+        recipient_email = contact['user'].email
+        if not recipient_email:
+            continue
+            
         try:
-            recipient_email = contact.get('email')
-            print(f"[DEBUG] Sending location SOS to {recipient_email}")
-            
             msg = MIMEMultipart()
-            msg['From'] = f"Proteeti <{GMAIL_SENDER}>"
+            msg['From'] = f"Proteeti SOS <{GMAIL_SENDER}>"
             msg['To'] = recipient_email
-            msg['Subject'] = "🚨 EMERGENCY SOS ALERT - LOCATION"
-            
-            body = f"""EMERGENCY SOS ALERT
+            msg['Subject'] = "EMERGENCY SOS - LIVE LOCATION"
 
-{user.username} needs immediate help!
+            body = f"""URGENT: {user.username} HAS TRIGGERED AN SOS!
 
-📍 LIVE LOCATION: {maps_link}
+Live Location: {maps_link}
 Coordinates: {latitude}, {longitude}
 
-IMMEDIATE ACTION REQUIRED!
-This is an automated SOS alert from Proteeti.
-An audio recording will follow shortly."""
-            
+This person needs immediate help.
+This is an automated alert from Proteeti Safety Network."""
+
             msg.attach(MIMEText(body, 'plain'))
-            
-            server = smtplib.SMTP('smtp.gmail.com', 587, timeout=10)
+
+            server = smtplib.SMTP('smtp.gmail.com', 587, timeout=15)
             server.starttls()
             server.login(GMAIL_SENDER, GMAIL_APP_PASSWORD.replace(" ", ""))
             server.send_message(msg)
             server.quit()
-            
-            print(f"[DEBUG] Location SOS sent to {recipient_email}")
+
+            print(f"[SOS] Location alert sent to network contact: {recipient_email}")
+            sent_to_anyone = True
+
         except Exception as e:
-            print(f"[DEBUG] Failed to send location SOS: {e}")
-            continue
-    
-    return True
+            print(f"[SOS] Failed to send to {recipient_email}: {e}")
+
+    # === 2. Send to Legacy Contacts (non-app users from onboarding) ===
+    if user.legacy_contacts:
+        for contact in user.legacy_contacts:
+            recipient_email = contact.get('email')
+            if not recipient_email:
+                continue
+                
+            try:
+                msg = MIMEMultipart()
+                msg['From'] = f"Proteeti SOS <{GMAIL_SENDER}>"
+                msg['To'] = recipient_email
+                msg['Subject'] = "EMERGENCY SOS from " + user.username
+
+                body = f"""EMERGENCY ALERT
+
+{user.username} has triggered an SOS alert!
+
+They added you as a trusted contact.
+
+Live Location: {maps_link}
+Coordinates: {latitude}, {longitude}
+
+Please check on them immediately!
+This is an automated message from Proteeti."""
+
+                msg.attach(MIMEText(body, 'plain'))
+
+                server = smtplib.SMTP('smtp.gmail.com', 587, timeout=15)
+                server.starttls()
+                server.login(GMAIL_SENDER, GMAIL_APP_PASSWORD.replace(" ", ""))
+                server.send_message(msg)
+                server.quit()
+
+                print(f"[SOS] Location alert sent to legacy contact: {recipient_email}")
+                sent_to_anyone = True
+
+            except Exception as e:
+                print(f"[SOS] Failed to send to legacy contact {recipient_email}: {e}")
+
+    if not sent_to_anyone:
+        print(f"[SOS] No contacts found for {user.username} — no emails sent")
+
+    return sent_to_anyone
 
 
 def send_sos_email_with_audio(user, audio_blob):
-    """Send SOS email with 2-minute audio recording"""
-    if not user.trusted_contacts:
-        print(f"[DEBUG] No trusted contacts found for {user.username}")
-        return False
-    
+    """Send SOS email with 2-minute audio to BOTH network + legacy contacts"""
     GMAIL_SENDER = os.getenv("GMAIL_SENDER")
     GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
     
     if not GMAIL_SENDER or not GMAIL_APP_PASSWORD:
-        print("[DEBUG] Gmail credentials not configured!")
+        print("[ERROR] Gmail credentials not configured!")
         return False
-    
-    audio_size_mb = len(audio_blob) / 1024 / 1024
-    print(f"[DEBUG] Audio file size: {audio_size_mb:.2f} MB")
-    
+
+    audio_size_mb = len(audio_blob) / (1024 * 1024)
+    print(f"[SOS] Preparing to send audio ({audio_size_mb:.2f} MB)")
+    sent_to_anyone = False
+
+    # === 1. Network Connections ===
     for contact in user.trusted_contacts:
+        recipient_email = contact['user'].email
+        if not recipient_email:
+            continue
+
         try:
-            recipient_email = contact.get('email')
-            print(f"[DEBUG] Sending audio SOS to {recipient_email}")
-            
             msg = MIMEMultipart()
-            msg['From'] = f"Proteeti <{GMAIL_SENDER}>"
+            msg['From'] = f"Proteeti SOS <{GMAIL_SENDER}>"
             msg['To'] = recipient_email
-            msg['Subject'] = "🚨 EMERGENCY SOS ALERT - AUDIO RECORDING"
-            
-            body = f"""EMERGENCY SOS ALERT - AUDIO EVIDENCE
+            msg['Subject'] = "EMERGENCY SOS - AUDIO EVIDENCE"
 
-{user.username} emergency audio recording (2 minutes) is attached.
+            body = f"""CRITICAL: {user.username} HAS TRIGGERED AN SOS
 
-Please review and take immediate action if needed.
+An emergency audio recording (2 minutes) is attached below.
 
-This is an automated SOS alert from Proteeti."""
-            
+Please listen immediately and take action if needed.
+
+This is an automated alert from Proteeti Safety Network."""
+
             msg.attach(MIMEText(body, 'plain'))
-            
+
             # Attach audio
-            from email.mime.application import MIMEApplication
             part = MIMEApplication(audio_blob)
-            part.add_header('Content-Disposition', 'attachment', filename='emergency_audio.webm')
+            part.add_header('Content-Disposition', 'attachment', filename='EMERGENCY_AUDIO.webm')
             msg.attach(part)
-            
-            server = smtplib.SMTP('smtp.gmail.com', 587, timeout=10)
+
+            server = smtplib.SMTP('smtp.gmail.com', 587, timeout=30)
             server.starttls()
             server.login(GMAIL_SENDER, GMAIL_APP_PASSWORD.replace(" ", ""))
             server.send_message(msg)
             server.quit()
-            
-            print(f"[DEBUG] Audio SOS sent successfully to {recipient_email}")
+
+            print(f"[SOS] Audio sent to network contact: {recipient_email}")
+            sent_to_anyone = True
+
         except Exception as e:
-            print(f"[DEBUG] Failed to send audio SOS: {e}")
-            continue
-    
-    return True
+            print(f"[SOS] Failed sending audio to {recipient_email}: {e}")
+
+    # === 2. Legacy Contacts ===
+    if user.legacy_contacts:
+        for contact in user.legacy_contacts:
+            recipient_email = contact.get('email')
+            if not recipient_email:
+                continue
+
+            try:
+                msg = MIMEMultipart()
+                msg['From'] = f"Proteeti SOS <{GMAIL_SENDER}>"
+                msg['To'] = recipient_email
+                msg['Subject'] = "EMERGENCY SOS AUDIO from " + user.username
+
+                body = f"""{user.username} has triggered an emergency SOS!
+
+They listed you as a trusted contact.
+
+A 2-minute audio recording from the incident is attached.
+
+Please listen and help immediately!
+
+This is an automated message from Proteeti."""
+
+                msg.attach(MIMEText(body, 'plain'))
+
+                part = MIMEApplication(audio_blob)
+                part.add_header('Content-Disposition', 'attachment', filename='EMERGENCY_AUDIO.webm')
+                msg.attach(part)
+
+                server = smtplib.SMTP('smtp.gmail.com', 587, timeout=30)
+                server.starttls()
+                server.login(GMAIL_SENDER, GMAIL_APP_PASSWORD.replace(" ", ""))
+                server.send_message(msg)
+                server.quit()
+
+                print(f"[SOS] Audio sent to legacy contact: {recipient_email}")
+                sent_to_anyone = True
+
+            except Exception as e:
+                print(f"[SOS] Failed sending audio to legacy contact {recipient_email}: {e}")
+
+    return sent_to_anyone
 
 
 
@@ -258,6 +342,11 @@ def login():
             print(f"Login successful for {user.username}")
             return redirect(url_for("index"))
         else:
+            print(f"Failed login attempt for {username_or_email}")
+            print(f"User found: {user is not None}")
+            print(f"Password correct: {user.check_password(password) if user else 'N/A'}")
+            print(f"Stored password hash: {user.password_hash if user else 'N/A'}")
+            print(f"Entered password: {password}")
             error = "Invalid username/email or password."
     
     return render_template("login.html", error=error)
@@ -516,33 +605,52 @@ def onboarding():
             user.profile = {}
             
         # Handle all form fields including dropdowns
-        profile_fields = ["full_name", "phone", "city", "language", "timezone"]
+        profile_fields = ["full_name", "phone", "country", "city", "language", "timezone"]
         for field in profile_fields:
             value = data.get(field)
             if value:
                 user.profile[field] = value
         
-            # Store both country code and country name
-            country_code = data.get("country")  # This is the code (BD, US, IN)
-            country_name = data.get("country_name")  # This comes from the hidden field
+        # Store both country code and country name
+        country_code = data.get("country")  # This is the code (BD, US, IN)
+        country_name = data.get("country_name")  # This comes from the hidden field
 
-            if country_code:
-                user.profile["country"] = country_code
-            if country_name:
-                user.profile["country_name"] = country_name
+        if country_code:
+            user.profile["country"] = country_code
+        if country_name:
+            user.profile["country_name"] = country_name
         
+        # Handle trusted contact
+        tc_email = data.get("tc_email")
+        existing_user = User.query.filter_by(email=tc_email).first() if tc_email else None
+        
+        if existing_user:
+            # Existing app user → send connection request
+            existing_conn = NetworkConnection.query.filter(
+                ((NetworkConnection.requester_id == user.id) & (NetworkConnection.recipient_id == existing_user.id)) |
+                ((NetworkConnection.requester_id == existing_user.id) & (NetworkConnection.recipient_id == user.id))
+            ).first()
+            
+            if not existing_conn:
+                conn = NetworkConnection(
+                    requester_id=user.id,
+                    recipient_id=existing_user.id,
+                    status='pending'
+                )
+                db.session.add(conn)
+        else:
+            # Non-app user → add to legacy_contacts
             trusted_contact = {
-                "id": len(user.trusted_contacts) + 1 if user.trusted_contacts else 1,
+                "id": len(user.legacy_contacts) + 1 if user.legacy_contacts else 1,
                 "name": data.get("tc_name"),
                 "relation": data.get("tc_relation"), 
-                "email": data.get("tc_email"),
-                "phone": data.get("tc_phone"),
-                "channel": data.get("tc_channel")
+                "email": tc_email,
+                "phone": data.get("tc_phone")
             }
-                    
-        if not user.trusted_contacts:
-            user.trusted_contacts = []
-        user.trusted_contacts.append(trusted_contact)
+            
+            if not user.legacy_contacts:
+                user.legacy_contacts = []
+            user.legacy_contacts.append(trusted_contact)
         
         db.session.commit()  
         return redirect(url_for("index"))  
@@ -578,6 +686,40 @@ def edit_profile():
                 if value is not None:
                     profile[key] = value
         user.profile = profile
+        
+        # Handle adding new legacy contact if fields are submitted (optional)
+        tc_name = form.get("tc_name")
+        if tc_name:  # If new contact form submitted
+            tc_email = form.get("tc_email")
+            existing_user = User.query.filter_by(email=tc_email).first() if tc_email else None
+            
+            if existing_user:
+                # Send connection request (same as onboarding)
+                existing_conn = NetworkConnection.query.filter(
+                    ((NetworkConnection.requester_id == user.id) & (NetworkConnection.recipient_id == existing_user.id)) |
+                    ((NetworkConnection.requester_id == existing_user.id) & (NetworkConnection.recipient_id == user.id))
+                ).first()
+                
+                if not existing_conn:
+                    conn = NetworkConnection(
+                        requester_id=user.id,
+                        recipient_id=existing_user.id,
+                        status='pending'
+                    )
+                    db.session.add(conn)
+            else:
+                # Add to legacy
+                new_contact = {
+                    "id": len(user.legacy_contacts) + 1 if user.legacy_contacts else 1,
+                    "name": tc_name,
+                    "relation": form.get("tc_relation"),
+                    "email": tc_email,
+                    "phone": form.get("tc_phone")
+                }
+                if not user.legacy_contacts:
+                    user.legacy_contacts = []
+                user.legacy_contacts.append(new_contact)
+        
         db.session.commit()
         return redirect(url_for("account"))
     return render_template("edit_profile.html", user=user)
@@ -638,6 +780,337 @@ def send_sos():
         print(f"[DEBUG] SOS error: {e}")
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+
+# ============= NETWORK CONNECTION ROUTES =============
+
+@app.route("/network")
+def network():
+    """View your safety network"""
+    if not session.get("loggedin"):
+        return redirect(url_for("login"))
+    
+    username = session.get("username")
+    user = User.query.filter_by(username=username).first()
+    
+    # Get accepted connections (mutual friends)
+    accepted_sent = NetworkConnection.query.filter_by(
+        requester_id=user.id, 
+        status='accepted'
+    ).all()
+    
+    accepted_received = NetworkConnection.query.filter_by(
+        recipient_id=user.id, 
+        status='accepted'
+    ).all()
+    
+    # Get pending requests you sent
+    pending_sent = NetworkConnection.query.filter_by(
+        requester_id=user.id, 
+        status='pending'
+    ).all()
+    
+    # Get pending requests you received
+    pending_received = NetworkConnection.query.filter_by(
+        recipient_id=user.id, 
+        status='pending'
+    ).all()
+    
+    # Build network list
+    network_users = []
+    
+    # Add accepted connections
+    for conn in accepted_sent:
+        contact = User.query.get(conn.recipient_id)
+        network_users.append({
+            'id': contact.id,
+            'username': contact.username,
+            'email': contact.email,
+            'status': 'connected',
+            'connection_id': conn.id
+        })
+    
+    for conn in accepted_received:
+        contact = User.query.get(conn.requester_id)
+        network_users.append({
+            'id': contact.id,
+            'username': contact.username,
+            'email': contact.email,
+            'status': 'connected',
+            'connection_id': conn.id
+        })
+    
+    # Add pending sent
+    pending_users = []
+    for conn in pending_sent:
+        contact = User.query.get(conn.recipient_id)
+        pending_users.append({
+            'id': contact.id,
+            'username': contact.username,
+            'email': contact.email,
+            'status': 'pending_sent',
+            'connection_id': conn.id
+        })
+    
+    # Add pending received (requests you need to accept)
+    requests = []
+    for conn in pending_received:
+        contact = User.query.get(conn.requester_id)
+        requests.append({
+            'id': contact.id,
+            'username': contact.username,
+            'email': contact.email,
+            'status': 'pending_received',
+            'connection_id': conn.id,
+            'created_at': conn.created_at
+        })
+    
+    return render_template("network.html", 
+                         network_users=network_users,
+                         pending_users=pending_users,
+                         requests=requests,
+                         user=user)
+
+
+@app.route("/api/search_users", methods=["GET"])
+def search_users():
+    """Search for users by username or email"""
+    if not session.get("loggedin"):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    query = request.args.get("q", "").strip()
+    
+    if len(query) < 2:
+        return jsonify([]), 200
+    
+    current_user = User.query.filter_by(username=session.get("username")).first()
+    
+    # Search users (exclude yourself)
+    users = User.query.filter(
+        (User.username.ilike(f"%{query}%")) | (User.email.ilike(f"%{query}%")),
+        User.id != current_user.id
+    ).limit(10).all()
+    
+    results = []
+    for u in users:
+        # Check if already connected
+        existing = NetworkConnection.query.filter(
+            ((NetworkConnection.requester_id == current_user.id) & (NetworkConnection.recipient_id == u.id)) |
+            ((NetworkConnection.requester_id == u.id) & (NetworkConnection.recipient_id == current_user.id))
+        ).first()
+        
+        status = 'none'
+        if existing:
+            if existing.status == 'accepted':
+                status = 'connected'
+            elif existing.requester_id == current_user.id:
+                status = 'pending_sent'
+            else:
+                status = 'pending_received'
+        
+        results.append({
+            'id': u.id,
+            'username': u.username,
+            'email': u.email,
+            'status': status
+        })
+    
+    return jsonify(results), 200
+
+
+@app.route("/api/send_connection_request", methods=["POST"])
+def send_connection_request():
+    """Send a connection request to another user"""
+    if not session.get("loggedin"):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        data = request.get_json()
+        recipient_id = data.get("user_id")
+        
+        current_user = User.query.filter_by(username=session.get("username")).first()
+        
+        if not recipient_id or recipient_id == current_user.id:
+            return jsonify({"error": "Invalid user"}), 400
+        
+        # Check if connection already exists
+        existing = NetworkConnection.query.filter(
+            ((NetworkConnection.requester_id == current_user.id) & (NetworkConnection.recipient_id == recipient_id)) |
+            ((NetworkConnection.requester_id == recipient_id) & (NetworkConnection.recipient_id == current_user.id))
+        ).first()
+        
+        if existing:
+            return jsonify({"error": "Connection already exists"}), 400
+        
+        # Create new connection request
+        connection = NetworkConnection(
+            requester_id=current_user.id,
+            recipient_id=recipient_id,
+            status='pending'
+        )
+        
+        db.session.add(connection)
+        db.session.commit()
+        
+        return jsonify({"message": "Connection request sent"}), 200
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/accept_connection", methods=["POST"])
+def accept_connection():
+    """Accept a connection request"""
+    if not session.get("loggedin"):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        data = request.get_json()
+        connection_id = data.get("connection_id")
+        
+        current_user = User.query.filter_by(username=session.get("username")).first()
+        
+        connection = NetworkConnection.query.get(connection_id)
+        
+        if not connection or connection.recipient_id != current_user.id:
+            return jsonify({"error": "Invalid connection"}), 400
+        
+        connection.status = 'accepted'
+        connection.accepted_at = bd_now()
+        
+        db.session.commit()
+        
+        return jsonify({"message": "Connection accepted"}), 200
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/decline_connection", methods=["POST"])
+def decline_connection():
+    """Decline/remove a connection"""
+    if not session.get("loggedin"):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        data = request.get_json()
+        connection_id = data.get("connection_id")
+        
+        current_user = User.query.filter_by(username=session.get("username")).first()
+        
+        connection = NetworkConnection.query.get(connection_id)
+        
+        if not connection:
+            return jsonify({"error": "Connection not found"}), 404
+        
+        # Can only decline if you're the recipient or it's your request
+        if connection.recipient_id != current_user.id and connection.requester_id != current_user.id:
+            return jsonify({"error": "Unauthorized"}), 403
+        
+        db.session.delete(connection)
+        db.session.commit()
+        
+        return jsonify({"message": "Connection removed"}), 200
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/network_sos")
+def get_network_sos():
+    """Get active SOS alerts from your network (UPDATED)"""
+    if not session.get("loggedin"):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    username = session.get("username")
+    user = User.query.filter_by(username=username).first()
+    
+    # Get all accepted connections
+    sent_connections = NetworkConnection.query.filter_by(
+        requester_id=user.id, 
+        status='accepted'
+    ).all()
+    
+    received_connections = NetworkConnection.query.filter_by(
+        recipient_id=user.id, 
+        status='accepted'
+    ).all()
+    
+    # Get user IDs of your network
+    network_user_ids = []
+    for conn in sent_connections:
+        network_user_ids.append(conn.recipient_id)
+    for conn in received_connections:
+        network_user_ids.append(conn.requester_id)
+    
+    # Get active SOS alerts from network
+    active_sos = []
+    if network_user_ids:
+        active_sos = SOSAlert.query.filter(
+            SOSAlert.status == 'active',
+            SOSAlert.user_id.in_(network_user_ids)
+        ).all()
+    
+    return jsonify([sos.to_dict() for sos in active_sos])
+
+
+@app.route("/api/update_sos_location", methods=["POST"])
+def update_sos_location():
+    """Update live location for active SOS"""
+    if not session.get("loggedin"):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        data = request.get_json()
+        sos_id = data.get("sos_id")
+        lat = float(data.get("lat"))
+        lng = float(data.get("lng"))
+        accuracy = data.get("accuracy", 0)
+        
+        current_user = User.query.filter_by(username=session.get("username")).first()
+        
+        sos = SOSAlert.query.get(sos_id)
+        
+        if not sos or sos.user_id != current_user.id:
+            return jsonify({"error": "Unauthorized"}), 403
+        
+        # Update location
+        sos.lat = lat
+        sos.lng = lng
+        sos.accuracy = accuracy
+        sos.last_updated = bd_now()
+        
+        db.session.commit()
+        
+        return jsonify({"message": "Location updated"}), 200
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/track/<int:sos_id>")
+def track_sos(sos_id):
+    """Live tracking page for SOS alert"""
+    if not session.get("loggedin"):
+        return redirect(url_for("login"))
+    
+    sos = SOSAlert.query.get_or_404(sos_id)
+    current_user = User.query.filter_by(username=session.get("username")).first()
+    
+    # Check if you're in their network
+    connection = NetworkConnection.query.filter(
+        ((NetworkConnection.requester_id == current_user.id) & (NetworkConnection.recipient_id == sos.user_id)) |
+        ((NetworkConnection.requester_id == sos.user_id) & (NetworkConnection.recipient_id == current_user.id)),
+        NetworkConnection.status == 'accepted'
+    ).first()
+    
+    if not connection and sos.user_id != current_user.id:
+        return "Unauthorized", 403
+    
+    return render_template("track_sos.html", sos=sos)
 
 
 @app.route("/send_sos_audio", methods=["POST"])

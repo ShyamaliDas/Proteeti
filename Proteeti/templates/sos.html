@@ -2,31 +2,31 @@
 {% block content %}
 <div class="text-center">
 <h2>Emergency SOS</h2>
-<p class="text-muted">Click the button to send your location and record audio for 2 minutes.</p>
+<p class="text-muted">Send your location and record audio. Your network will track you live.</p>
 <button id="sosBtn" class="btn btn-danger btn-lg mt-3 p-4 fs-3" style="background-color: #8b0606; border-color: #8B0000; border-radius: 15px; min-width: 200px;">
     🚨 SEND SOS NOW
 </button>
 <button id="stopBtn" class="btn btn-secondary btn-lg mt-4 p-3 fs-4"
-            style="border-radius: 12px; min-width: 160px; display: none;">
-        🛑 STOP RECORDING
+        style="border-radius: 12px; min-width: 160px; display: none;">
+    🛑 STOP RECORDING
 </button>
 
 <div id="status" class="mt-3"></div>
 <div id="timer" class="mt-2" style="font-size: 20px; font-weight: bold; display: none;"></div>
 <div id="result" class="mt-3"></div>
 </div>
+
 <script>
-
-
 let mediaRecorder;
 let recordedAudioChunks = [];
 let recordingActive = false;
 let timerInterval = null;
 let stream = null;
+let activeSosId = null;
+let locationUpdateInterval = null;
 
 document.getElementById('sosBtn').addEventListener('click', async function() {
     this.disabled = true;
-    document.getElementById('sosBtn').disabled = true;
     document.getElementById('status').innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Getting location...</div>';
 
     if (!navigator.geolocation) {
@@ -42,12 +42,8 @@ document.getElementById('sosBtn').addEventListener('click', async function() {
             const lng = position.coords.longitude;
             const accuracy = position.coords.accuracy;
 
-            console.log('[SOS] Location:', lat, lng, 'Accuracy:', accuracy, 'm');
-
-           
-
             try {
-                // Step 1: Send location immediately WITH accuracy
+                // Send initial SOS
                 const locationResponse = await fetch('/send_sos', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -63,13 +59,15 @@ document.getElementById('sosBtn').addEventListener('click', async function() {
                     return;
                 }
 
-                document.getElementById('status').innerHTML =
-                    '<div class="alert alert-success"><i class="fas fa-check"></i> Location sent! Recording audio...</div>';
-                await startAudioRecording();
+                activeSosId = locationResult.alert_id;
 
-                console.log('[SOS] Location sent, starting audio recording');
                 document.getElementById('status').innerHTML =
-                    '<div class="alert alert-success"><i class="fas fa-check"></i> Location sent! Recording audio...</div>';
+                    '<div class="alert alert-success"><i class="fas fa-check"></i> SOS Sent! Your network is tracking you live. Recording audio...</div>';
+                
+                // Start live location updates
+                startLiveLocationUpdates();
+                
+                // Start audio recording
                 await startAudioRecording();
 
             } catch (error) {
@@ -91,27 +89,63 @@ document.getElementById('sosBtn').addEventListener('click', async function() {
     );
 });
 
+// Live location updates every 5 seconds
+function startLiveLocationUpdates() {
+    locationUpdateInterval = setInterval(() => {
+        if (!activeSosId) return;
+        
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                const accuracy = position.coords.accuracy;
+                
+                try {
+                    await fetch('/api/update_sos_location', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            sos_id: activeSosId,
+                            lat: lat,
+                            lng: lng,
+                            accuracy: accuracy
+                        })
+                    });
+                    console.log('Location updated:', lat, lng);
+                } catch (error) {
+                    console.error('Failed to update location:', error);
+                }
+            },
+            (error) => {
+                console.error('Geolocation error:', error);
+            },
+            { enableHighAccuracy: true, maximumAge: 0 }
+        );
+    }, 5000); // Update every 5 seconds
+}
 
 document.getElementById('stopBtn').addEventListener('click', function() {
     if (!mediaRecorder || !recordingActive) return;
 
-
     recordingActive = false;
+    
     if (timerInterval) {
         clearInterval(timerInterval);
         timerInterval = null;
     }
+    
+    if (locationUpdateInterval) {
+        clearInterval(locationUpdateInterval);
+        locationUpdateInterval = null;
+    }
 
     document.getElementById('stopBtn').style.display = 'none';
-    clearInterval(timerInterval);
     document.getElementById('timer').style.display = 'none';
     mediaRecorder.stop();
 });
 
-
 async function startAudioRecording() {
     try {
-        console.log('[SOS] Requesting microphone access');
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
         document.getElementById('timer').style.display = 'block';
@@ -125,16 +159,20 @@ async function startAudioRecording() {
         mediaRecorder.ondataavailable = (event) => {
             if (event.data.size > 0) {
                 recordedAudioChunks.push(event.data);
-                console.log('[SOS] Audio chunk saved:', event.data.size, 'bytes');
             }
         };
 
         mediaRecorder.onstop = async () => {
-
             if (timerInterval) {
                 clearInterval(timerInterval);
                 timerInterval = null;
             }
+            
+            if (locationUpdateInterval) {
+                clearInterval(locationUpdateInterval);
+                locationUpdateInterval = null;
+            }
+            
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
                 stream = null;
@@ -147,15 +185,12 @@ async function startAudioRecording() {
             recordingActive = false;
         };
 
-
-        // Timer for 2 minutes (120 seconds)
         let seconds = 0;
         timerInterval = setInterval(() => {
             seconds++;
             document.getElementById('timer').innerHTML = `Recording: ${seconds}s / 120s`;
 
             if (seconds >= 120) {
-
                 if (recordingActive) {
                     recordingActive = false;
                     clearInterval(timerInterval);
@@ -170,7 +205,7 @@ async function startAudioRecording() {
         mediaRecorder.start();
 
     } catch (error) {
-        console.error('[SOS] Microphone error:', error);
+        console.error('Microphone error:', error);
         let errorMsg = 'Cannot access microphone: ' + error.message;
         if (error.name === 'NotAllowedError') {
             errorMsg = 'Microphone permission denied. Please enable it in settings.';
@@ -185,7 +220,6 @@ async function startAudioRecording() {
 
 async function sendAudio(audioBlob) {
     try {
-        console.log('[SOS] Sending audio to server');
         document.getElementById('timer').style.display = 'none';
         document.getElementById('status').innerHTML =
             '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Sending audio...</div>';
@@ -202,17 +236,15 @@ async function sendAudio(audioBlob) {
 
         if (response.ok) {
             document.getElementById('status').innerHTML =
-                '<div class="alert alert-success"><i class="fas fa-check-circle"></i> <strong>SOS Complete!</strong><br/>Location and audio sent to trusted contacts.</div>';
-            document.getElementById('result').innerHTML =
-                '<p>Audio size: ' + (audioBlob.size / 1024).toFixed(2) + ' KB</p>';
+                '<div class="alert alert-success"><i class="fas fa-check-circle"></i> <strong>SOS Complete!</strong><br/>Your network can now track you live.</div>';
         } else {
             document.getElementById('status').innerHTML =
-                '<div class="alert alert-warning"><i class="fas fa-exclamation"></i> Location was sent, but audio failed: ' + result.error + '</div>';
+                '<div class="alert alert-warning">Location sent and tracking active, but audio failed: ' + result.error + '</div>';
         }
     } catch (error) {
-        console.error('[SOS] Error sending audio:', error);
+        console.error('Error sending audio:', error);
         document.getElementById('status').innerHTML =
-            '<div class="alert alert-warning"><i class="fas fa-exclamation"></i> Location was sent, but audio failed: ' + error.message + '</div>';
+            '<div class="alert alert-warning">Location sent and tracking active, but audio failed: ' + error.message + '</div>';
     } finally {
         document.getElementById('sosBtn').disabled = false;
         recordedAudioChunks = [];
@@ -220,4 +252,3 @@ async function sendAudio(audioBlob) {
 }
 </script>
 {% endblock %}
-

@@ -342,75 +342,63 @@
                 <p>People who will be notified in emergencies</p>
             </div>
 
-            <button class="btn btn-danger mb-4" onclick="toggleAddForm()">
-                <i class="fas fa-plus"></i> Add Trusted Contact
-            </button>
-
-            <!-- Add Contact Form -->
-            <div class="card bg-light border d-none mb-4" id="addContactForm">
-                <div class="card-body">
-                    <h3 class="h5 mb-3">Add New Contact</h3>
-                    <form id="contactForm">
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Name *</label>
-                            <input type="text" class="form-control" id="contactName" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Email *</label>
-                            <input type="email" class="form-control" id="contactEmail" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Phone Number</label>
-                            <input type="tel" class="form-control" id="contactPhone">
-                        </div>
-                        <div class="md-3">
-                            <label class="form-label fw-bold">Relation</label>
-                            <input class="form-control" id="tc_relation">
-                        </div><br>
-
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-check"></i> Add Contact
-                            </button>
-                            <button type="button" class="btn btn-secondary" onclick="toggleAddForm()">
-                                Cancel
-                            </button>
-                        </div>
-                    </form>
-                </div>
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> 
+                Your trusted contacts are now managed through your safety network. 
+                <a href="{{ url_for('network') }}" class="alert-link">Go to Network</a> to add connections.
             </div>
 
-            <!-- Contacts List -->
-            {% if user.trusted_contacts %}
-                {% for contact in user.trusted_contacts %}
-                <div class="contact-card" data-contact-id="{{ contact.id }}">
-                    <div class="contact-info">
-                        <h3>{{ contact.name }}</h3>
-                        <div class="contact-details">
-                            {% if contact.relation %}
-                            <div><strong>Relation:</strong> {{ contact.relation }}</div>
-                            {% endif %}
-                            {% if contact.email %}
-                            <div><strong>Email:</strong> {{ contact.email }}</div>
-                            {% endif %}
-                            {% if contact.phone %}
-                            <div><strong>Phone:</strong> {{ contact.phone }}</div>
-                            {% endif %}
-                            {% if contact.channel %}
-                            <div><strong>Preferred:</strong> {{ contact.channel }}</div>
-                            {% endif %}
-                        </div>
+            <!-- Network Connections List -->
+            {% if network_connections %}
+            <h5>Network Connections (Mutual App Users)</h5>
+            {% for contact in network_connections %}
+            <div class="contact-card" data-contact-id="{{ contact.connection_id }}">
+                <div class="contact-info">
+                    <h3>{{ contact.username }}</h3>
+                    <div class="contact-details">
+                        {% if contact.email %}
+                        <div><strong>Email:</strong> {{ contact.email }}</div>
+                        {% endif %}
+                        <div><strong>Status:</strong> <span class="badge bg-success">Connected</span></div>
                     </div>
-                    <button class="btn btn-danger btn-sm" onclick="removeContact('{{ contact.id }}')">
-                        <i class="fas fa-trash"></i>Remove
-                    </button>
                 </div>
-                {% endfor %}
+                <button class="btn btn-danger btn-sm" onclick="removeConnection('{{ contact.connection_id }}')">
+                    <i class="fas fa-trash"></i> Remove
+                </button>
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            <!-- Legacy Contacts List -->
+            {% if user.legacy_contacts %}
+            <h5>Legacy Contacts (Non-App Users)</h5>
+            {% for contact in user.legacy_contacts %}
+            <div class="contact-card" data-contact-id="{{ contact.id }}">
+                <div class="contact-info">
+                    <h3>{{ contact.name }}</h3>
+                    <div class="contact-details">
+                        {% if contact.email %}
+                        <div><strong>Email:</strong> {{ contact.email }}</div>
+                        {% endif %}
+                        {% if contact.phone %}
+                        <div><strong>Phone:</strong> {{ contact.phone }}</div>
+                        {% endif %}
+                        {% if contact.relation %}
+                        <div><strong>Relation:</strong> {{ contact.relation }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <!-- Add remove button if you want to implement delete legacy contact -->
+            </div>
+            {% endfor %}
             {% else %}
                 <div class="empty-state">
                     <i class="fas fa-users"></i>
                     <p>No trusted contacts added yet</p>
-                    <p class="small">Add at least one contact for emergencies</p>
+                    <p class="small">Add connections in your safety network</p>
+                    <a href="{{ url_for('network') }}" class="btn btn-primary mt-3">
+                        <i class="fas fa-network-wired"></i> Go to Network
+                    </a>
                 </div>
             {% endif %}
         </div>
@@ -602,35 +590,35 @@ document.getElementById('contactForm')?.addEventListener('submit', async (e) => 
     }
 });
 
-async function removeContact(contactId) {
-    if (!confirm('Are you sure you want to remove this trusted contact?')) {
+async function removeConnection(connectionId) {
+    if (!confirm('Are you sure you want to remove this connection?')) {
         return;
     }
 
     try {
-        const response = await fetch('/remove_trusted_contact', {
+        const response = await fetch('/api/decline_connection', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ contact_id: contactId })
+            body: JSON.stringify({ connection_id: connectionId })
         });
 
         const data = await response.json();
 
         if (response.ok) {
-            showMessage('Trusted contact removed successfully!');
-            document.querySelector(`[data-contact-id="${contactId}"]`).remove();
+            showMessage('Connection removed successfully!');
+            document.querySelector(`[data-contact-id="${connectionId}"]`)?.remove();
 
             const contactsList = document.querySelectorAll('[data-contact-id]');
             if (contactsList.length === 0) {
                 location.reload();
             }
         } else {
-            showMessage(data.error || 'Failed to remove contact', true);
+            showMessage(data.error || 'Failed to remove connection', true);
         }
     } catch (error) {
-        showMessage('Error removing contact: ' + error.message, true);
+        showMessage('Error removing connection: ' + error.message, true);
     }
 }
 </script>

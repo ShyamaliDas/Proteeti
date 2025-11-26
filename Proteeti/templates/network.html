@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <h2 class="mb-4">My Safety Network</h2>
+            
+            <!-- Search Users -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Add New Connection</h5>
+                    <div class="input-group">
+                        <input type="text" id="searchInput" class="form-control" placeholder="Search by username or email...">
+                        <button class="btn btn-primary" onclick="searchUsers()">Search</button>
+                    </div>
+                    <div id="searchResults" class="mt-3"></div>
+                </div>
+            </div>
+            
+            <!-- Pending Requests (you received) -->
+            {% if requests and requests|length > 0 %}
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title text-warning">
+                        <i class="bi bi-bell-fill"></i> Pending Requests ({{ requests|length }})
+                    </h5>
+                    <div class="list-group">
+                        {% for req in requests %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ req.username }}</strong>
+                                <br><small class="text-muted">{{ req.email }}</small>
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-success" onclick="acceptConnection('{{ req.connection_id }}')">
+                                    <i class="bi bi-check-circle"></i> Accept
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="declineConnection('{{ req.connection_id }}')">
+                                    <i class="bi bi-x-circle"></i> Decline
+                                </button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Your Network -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title text-success">
+                        <i class="bi bi-people-fill"></i> Connected ({{ network_users|length if network_users else 0 }})
+                    </h5>
+                    {% if network_users and network_users|length > 0 %}
+                    <div class="list-group">
+                        {% for contact in network_users %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ contact.username }}</strong>
+                                <br><small class="text-muted">{{ contact.email }}</small>
+                                <br><span class="badge bg-success">Connected</span>
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-outline-danger" onclick="removeConnection('{{ contact.connection_id }}')">
+                                    <i class="bi bi-trash"></i> Remove
+                                </button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No connections yet. Search for users above to connect!</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Pending Sent Requests -->
+            {% if pending_users and pending_users|length > 0 %}
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title text-secondary">
+                        <i class="bi bi-clock"></i> Pending Sent ({{ pending_users|length }})
+                    </h5>
+                    <div class="list-group">
+                        {% for user in pending_users %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ user.username }}</strong>
+                                <br><small class="text-muted">{{ user.email }}</small>
+                                <br><span class="badge bg-secondary">Waiting for acceptance</span>
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="cancelRequest('{{ user.connection_id }}')">
+                                    Cancel Request
+                                </button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Active SOS Alerts -->
+            <div class="card border-danger">
+                <div class="card-body">
+                    <h5 class="card-title text-danger">
+                        <i class="bi bi-exclamation-triangle-fill"></i> Active SOS Alerts
+                    </h5>
+                    <div id="activeSosAlerts">
+                        <p class="text-muted">Loading...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Search users
+async function searchUsers() {
+    const query = document.getElementById('searchInput').value;
+    if (query.length < 2) {
+        alert('Please enter at least 2 characters');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/search_users?q=' + encodeURIComponent(query));
+        const users = await response.json();
+        
+        const resultsDiv = document.getElementById('searchResults');
+        
+        if (users.length === 0) {
+            resultsDiv.innerHTML = '<p class="text-muted">No users found</p>';
+            return;
+        }
+        
+        resultsDiv.innerHTML = '<div class="list-group">' + users.map(user => 
+            '<div class="list-group-item d-flex justify-content-between align-items-center">' +
+                '<div>' +
+                    '<strong>' + escapeHtml(user.username) + '</strong>' +
+                    '<br><small class="text-muted">' + escapeHtml(user.email) + '</small>' +
+                '</div>' +
+                '<div>' + getConnectionButton(user) + '</div>' +
+            '</div>'
+        ).join('') + '</div>';
+    } catch (error) {
+        console.error('Search error:', error);
+        alert('Error searching users');
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function getConnectionButton(user) {
+    if (user.status === 'connected') {
+        return '<span class="badge bg-success">Already Connected</span>';
+    } else if (user.status === 'pending_sent') {
+        return '<span class="badge bg-secondary">Request Sent</span>';
+    } else if (user.status === 'pending_received') {
+        return '<span class="badge bg-warning">Pending Your Approval</span>';
+    } else {
+        return '<button class="btn btn-sm btn-primary" onclick="sendRequest(' + user.id + ')">Connect</button>';
+    }
+}
+
+async function sendRequest(userId) {
+    try {
+        const response = await fetch('/api/send_connection_request', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({user_id: userId})
+        });
+        
+        if (response.ok) {
+            alert('Connection request sent!');
+            searchUsers();
+        } else {
+            const error = await response.json();
+            alert('Error: ' + error.error);
+        }
+    } catch (error) {
+        console.error('Request error:', error);
+        alert('Error sending request');
+    }
+}
+
+async function acceptConnection(connectionId) {
+    try {
+        const response = await fetch('/api/accept_connection', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({connection_id: connectionId})
+        });
+        
+        if (response.ok) {
+            alert('Connection accepted!');
+            location.reload();
+        } else {
+            alert('Error accepting connection');
+        }
+    } catch (error) {
+        console.error('Accept error:', error);
+        alert('Error accepting connection');
+    }
+}
+
+async function declineConnection(connectionId) {
+    if (!confirm('Decline this request?')) return;
+    
+    try {
+        const response = await fetch('/api/decline_connection', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({connection_id: connectionId})
+        });
+        
+        if (response.ok) {
+            alert('Request declined');
+            location.reload();
+        } else {
+            alert('Error declining request');
+        }
+    } catch (error) {
+        console.error('Decline error:', error);
+        alert('Error declining request');
+    }
+}
+
+async function removeConnection(connectionId) {
+    if (!confirm('Remove this connection?')) return;
+    
+    try {
+        const response = await fetch('/api/decline_connection', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({connection_id: connectionId})
+        });
+        
+        if (response.ok) {
+            alert('Connection removed');
+            location.reload();
+        } else {
+            alert('Error removing connection');
+        }
+    } catch (error) {
+        console.error('Remove error:', error);
+        alert('Error removing connection');
+    }
+}
+
+async function cancelRequest(connectionId) {
+    if (!confirm('Cancel this request?')) return;
+    
+    try {
+        const response = await fetch('/api/decline_connection', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({connection_id: connectionId})
+        });
+        
+        if (response.ok) {
+            alert('Request cancelled');
+            location.reload();
+        } else {
+            alert('Error cancelling request');
+        }
+    } catch (error) {
+        console.error('Cancel error:', error);
+        alert('Error cancelling request');
+    }
+}
+
+// Load active SOS alerts
+async function loadActiveSOS() {
+    try {
+        const response = await fetch('/api/network_sos');
+        const alerts = await response.json();
+        
+        const container = document.getElementById('activeSosAlerts');
+        
+        if (alerts.length === 0) {
+            container.innerHTML = '<p class="text-muted">No active SOS alerts</p>';
+            return;
+        }
+        
+        container.innerHTML = alerts.map(sos => 
+            '<div class="alert alert-danger">' +
+                '<h6 class="alert-heading">🚨 ' + escapeHtml(sos.username) + ' needs help!</h6>' +
+                '<p class="mb-1"><strong>Location:</strong> ' + sos.lat.toFixed(5) + ', ' + sos.lng.toFixed(5) + '</p>' +
+                '<p class="mb-1"><strong>Time:</strong> ' + sos.created_at + '</p>' +
+                '<hr>' +
+                '<div class="d-flex gap-2">' +
+                    '<a href="/track/' + sos.id + '" class="btn btn-sm btn-danger">' +
+                        '<i class="bi bi-geo-alt-fill"></i> Track Live Location' +
+                    '</a>' +
+                    '<button class="btn btn-sm btn-outline-danger" ' +
+                            'onclick="window.open(\'https://www.google.com/maps/dir/?api=1&destination=' + sos.lat + ',' + sos.lng + '\', \'_blank\')">' +
+                        '<i class="bi bi-map"></i> Navigate' +
+                    '</button>' +
+                '</div>' +
+            '</div>'
+        ).join('');
+    } catch (error) {
+        console.error('Error loading SOS alerts:', error);
+        document.getElementById('activeSosAlerts').innerHTML = 
+            '<p class="text-muted">Error loading SOS alerts</p>';
+    }
+}
+
+// Refresh SOS alerts every 5 seconds
+setInterval(loadActiveSOS, 5000);
+loadActiveSOS();
+</script>
+{% endblock %}
