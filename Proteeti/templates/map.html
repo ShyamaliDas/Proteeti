@@ -1,4 +1,3 @@
-
 {% extends "base.html" %}
 {% block content %}
 <div class="container" id="mapContainer" data-loggedin="{{ session.get('loggedin')|tojson }}" data-center-lat="{{ center_lat|tojson }}" data-center-lng="{{ center_lng|tojson }}">
@@ -6,19 +5,43 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 class="mb-0">Community Safety Map</h2>
         <div>
-            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#reportModal">Report an unsafe area</button>
+            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#reportModal">
+                <i class="bi bi-exclamation-triangle"></i> Report Unsafe Area
+            </button>
         </div>
     </div>
     <small class="text-muted d-block mt-2">Click anywhere on the map to report an unsafe area</small>
     <div id="map" style="height: 500px; width: 95%; border-radius: 8px;"></div>
     
+    <!-- Map Legend -->
+    <div class="map-legend mt-3 p-3 border rounded bg-light">
+        <h6 class="mb-2"><i class="bi bi-info-circle"></i> Map Legend</h6>
+        <div class="d-flex flex-wrap gap-3">
+            <div class="legend-item d-flex align-items-center">
+                <div class="legend-color me-2" style="width: 16px; height: 16px; background: #dc2626; border-radius: 50%; animation: pulse 2s infinite;"></div>
+                <small>Active SOS</small>
+            </div>
+            <div class="legend-item d-flex align-items-center">
+                <div class="legend-color me-2" style="width: 16px; height: 16px; background: #10b981; border-radius: 50%;"></div>
+                <small>Resolved SOS</small>
+            </div>
+            <div class="legend-item d-flex align-items-center">
+                <div class="legend-color me-2" style="width: 16px; height: 16px; background: #f59e0b; border-radius: 50%;"></div>
+                <small>Hazard Report</small>
+            </div>
+            <div class="legend-item d-flex align-items-center">
+                <div class="legend-color me-2" style="width: 16px; height: 16px; background: #6b7280; border-radius: 50%;"></div>
+                <small>Network SOS</small>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="modal fade" id="reportModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <form id="reportForm" class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Report an unsafe area</h5>
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Report Unsafe Area</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -41,7 +64,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-primary">Send report</button>
+                <button type="submit" class="btn btn-primary">Send Report</button>
             </div>
         </form>
     </div>
@@ -60,6 +83,69 @@
 
     let selectedMarker = null;
 
+    // SOS Marker Styles
+    function getSOSIcon(status) {
+        if (status === 'resolved') {
+            return L.divIcon({
+                className: 'resolved-marker-container',
+                html: '<div class="resolved-marker"><i class="bi bi-check-lg"></i></div>',
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+            });
+        } else {
+            // Active SOS marker (pulsing red)
+            return L.divIcon({
+                className: 'sos-marker-container',
+                html: '<div class="sos-marker"><i class="bi bi-exclamation-lg"></i></div>',
+                iconSize: [36, 36],
+                iconAnchor: [18, 18]
+            });
+        }
+    }
+
+    // Add CSS for markers
+    const sosMarkerStyles = `
+    .sos-marker {
+        width: 36px; height: 36px;
+        background: #dc2626;
+        border: 3px solid white;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 14px;
+        font-weight: bold;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .resolved-marker {
+        width: 32px; height: 32px;
+        background: #10b981;
+        border: 3px solid white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(220,38,38,0.8); }
+        70% { box-shadow: 0 0 0 12px rgba(220,38,38,0); }
+        100% { box-shadow: 0 0 0 0 rgba(220,38,38,0); }
+    }
+    `;
+
+    // Inject the styles
+    if (!document.querySelector('#sos-marker-styles')) {
+        const styleSheet = document.createElement("style");
+        styleSheet.id = 'sos-marker-styles';
+        styleSheet.innerText = sosMarkerStyles;
+        document.head.appendChild(styleSheet);
+    }
+
     async function loadExistingReports() {
         try {
             const response = await fetch('/api/reports');
@@ -67,10 +153,13 @@
             reports.forEach(report => {
                 const marker = L.marker([report.lat, report.lng]).addTo(map);
                 marker.bindPopup(`
-                    <b>Category:</b> ${report.category}<br>
-                    <b>Description:</b> ${report.description || 'None'}<br>
-                    <b>Reported By:</b> ${report.username}<br>
-                    <b>Time:</b> ${new Date(report.timestamp).toLocaleString()}
+                    <div style="min-width: 200px;">
+                        <h6 class="text-warning mb-2"><i class="bi bi-exclamation-triangle"></i> Hazard Report</h6>
+                        <p class="mb-1"><strong>Category:</strong> ${report.category}</p>
+                        <p class="mb-1"><strong>Description:</strong> ${report.description || 'None'}</p>
+                        <p class="mb-1"><strong>Reported By:</strong> ${report.username}</p>
+                        <p class="mb-0"><strong>Time:</strong> ${new Date(report.timestamp).toLocaleString()}</p>
+                    </div>
                 `);
             });
         } catch (error) {
@@ -79,126 +168,93 @@
     }
     loadExistingReports();
 
-    map.on('click', function(e) {
-        // read logged-in state injected into HTML data attribute to avoid template syntax inside JS
-        const isLoggedIn = JSON.parse(document.getElementById('mapContainer').dataset.loggedin);
-        if (!isLoggedIn) {
-            alert('Please login first to report hazards');
-            window.location.href = '/login';
-            return;
-        }
-
-        if (selectedMarker) map.removeLayer(selectedMarker);
-        selectedMarker = L.marker(e.latlng).addTo(map);
-        new bootstrap.Modal(document.getElementById('reportModal')).show();
-    });
-
-
-    const reportModalEl = document.getElementById('reportModal');
-    if (reportModalEl) {
-        reportModalEl.addEventListener('hidden.bs.modal', function () {
-            if (selectedMarker) {
-                map.removeLayer(selectedMarker);
-                selectedMarker = null;
-            }
-    });
-    }
-
-
+    // Load SOS alerts with custom markers
     async function loadSosAlerts() {
         try {
-            const response = await fetch('/api/sos-alerts');
-            const sosAlerts = await response.json();
-            sosAlerts.forEach(alert => {
-                // Use a red marker icon for SOS (see Leaflet.icon if you want custom images)
-                const marker = L.marker([alert.lat, alert.lng], {
-                    icon: L.icon({
-                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
-                        iconSize: [25, 41],
-                        iconAnchor: [12, 41],
-                        popupAnchor: [1, -34],
-                    })
-                }).addTo(map);
-                marker.bindPopup(
-                    `<b><span style="color:#8b0606;">SOS Alert!</span></b><br>
-                    <b>User:</b> ${alert.username || 'Unknown'}<br>
-                    <b>Time:</b> ${new Date(alert.created_at).toLocaleString()}`
-                );
-            });
-            console.log('Loading SOS alerts...');
-            console.log('Response:', sosAlerts);
-
-        } catch (error) {
-            console.log('No SOS alerts or error loading:', error);
-        }
-    }    
-
-    loadSosAlerts();
-
-    // Load SOS alerts from your Proteeti network
-    async function loadNetworkSOS() {
-        try {
-            const response = await fetch('/api/network_sos');
-            const sosAlerts = await response.json();
+            console.log('🗺️ Starting to load SOS alerts...');
             
-            sosAlerts.forEach(alert => {
-                // Create pulsating SOS marker for network alerts
-                const sosMarker = L.marker([alert.lat, alert.lng], {
-                    icon: L.icon({
-                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
-                        iconSize: [30, 46],
-                        iconAnchor: [15, 46],
-                        popupAnchor: [1, -34],
-                    })
-                }).addTo(map);
+            const response = await fetch('/api/map_sos_alerts');
+            console.log('🗺️ API Response status:', response.status);
+            
+            const sosAlerts = await response.json();
+            console.log('🗺️ SOS Alerts data received:', sosAlerts);
+            
+            if (!sosAlerts || sosAlerts.length === 0) {
+                console.log('🗺️ No SOS alerts found');
+                return;
+            }
+            
+            let activeCount = 0;
+            let resolvedCount = 0;
+            
+            sosAlerts.forEach((alert, index) => {
+                console.log(`🗺️ Processing alert ${index + 1}:`, alert);
                 
-                sosMarker.bindPopup(`
-                    <div style="min-width: 220px;">
-                        <h6 class="text-danger mb-2">🚨 ${alert.username} needs help!</h6>
-                        <p class="mb-1"><strong>Time:</strong> ${new Date(alert.created_at).toLocaleString()}</p>
-                        <p class="mb-1"><strong>Status:</strong> <span class="text-danger">ACTIVE SOS</span></p>
-                        <small class="text-muted">From your safety network</small>
-                        <div class="mt-2">
-                            <button class="btn btn-sm btn-outline-danger w-100" 
-                                    onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${alert.lat},${alert.lng}&travelmode=driving', '_blank')">
-                                Navigate to Location
-                            </button>
-                        </div>
-                    </div>
-                `);
+                // Count by status
+                if (alert.status === 'active') activeCount++;
+                if (alert.status === 'resolved') resolvedCount++;
                 
-                // Make marker pulse for attention
-                const markerElement = sosMarker.getElement();
-                if (markerElement) {
-                    markerElement.style.animation = 'pulse 2s infinite';
+                try {
+                    const icon = getSOSIcon(alert.status);
+                    console.log(`🗺️ Created icon for ${alert.status} alert`);
+                    
+                    const marker = L.marker([alert.lat, alert.lng], { icon: icon }).addTo(map);
+                    console.log(`🗺️ Added marker to map at ${alert.lat}, ${alert.lng}`);
+                    
+                    let popupContent = `
+                        <div style="min-width: 220px;">
+                            <h6 class="${alert.status === 'active' ? 'text-danger' : 'text-success'} mb-2">
+                                <i class="bi ${alert.status === 'active' ? 'bi-exclamation-triangle' : 'bi-check-circle'}"></i>
+                                ${alert.status === 'active' ? 'ACTIVE SOS' : 'RESOLVED SOS'}
+                            </h6>
+                            <p class="mb-1"><strong>User:</strong> ${alert.username || 'Unknown'}</p>
+                            <p class="mb-1"><strong>Time:</strong> ${new Date(alert.created_at).toLocaleString()}</p>
+                            <p class="mb-1"><strong>Accuracy:</strong> ${Math.round(alert.accuracy)}m</p>
+                    `;
+                    
+                    // Use last_updated instead of resolved_at since we don't have that column
+                    if (alert.status === 'resolved' && alert.last_updated) {
+                        popupContent += `<p class="mb-1"><strong>Resolved:</strong> ${new Date(alert.last_updated).toLocaleString()}</p>`;
+                    }
+                    
+                    if (alert.status === 'active') {
+                        popupContent += `
+                            <div class="mt-2">
+                                <a href="/track_sos/${alert.id}" class="btn btn-sm btn-danger w-100">
+                                    <i class="bi bi-geo-alt"></i> Live Track
+                                </a>
+                            </div>
+                        `;
+                    } else {
+                        popupContent += `
+                            <div class="mt-2">
+                                <small class="text-muted"><i class="bi bi-info-circle"></i> This SOS has been resolved</small>
+                            </div>
+                        `;
+                    }
+                    
+                    popupContent += `</div>`;
+                    marker.bindPopup(popupContent);
+                    console.log(`🗺️ Bound popup to marker`);
+                    
+                } catch (error) {
+                    console.error(`🗺️ Error creating marker for alert ${index + 1}:`, error);
                 }
             });
             
-            if (sosAlerts.length > 0) {
-                console.log(`🚨 Loaded ${sosAlerts.length} active SOS alerts from your network`);
-            }
+            console.log(`🗺️ Finished loading SOS alerts: ${activeCount} active, ${resolvedCount} resolved, total ${sosAlerts.length}`);
+            
         } catch (error) {
-            console.log('No active SOS alerts from your network');
+            console.error('🗺️ Error loading SOS alerts:', error);
         }
     }
-
-    // Add CSS for pulsing animation
-    const pulseStyle = document.createElement('style');
-    pulseStyle.textContent = `
-        @keyframes pulse {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.1); opacity: 0.8; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-    `;
-    document.head.appendChild(pulseStyle);
-
-    // Call this function after your existing loadSosAlerts()
-    loadNetworkSOS();
-
+    loadSosAlerts();
     document.getElementById('reportForm')?.addEventListener('submit', async function(e) {
         e.preventDefault();
-        if (!selectedMarker) { alert('Please select a location on the map first'); return; }
+        if (!selectedMarker) { 
+            alert('Please select a location on the map first'); 
+            return; 
+        }
 
         const category = document.getElementById('reportCategory').value;
         const description = document.getElementById('reportDescription').value;
@@ -219,10 +275,13 @@
 
                 const newMarker = L.marker([lat, lng]).addTo(map);
                 newMarker.bindPopup(`
-                    <b>Category:</b> ${category}<br>
-                    <b>Description:</b> ${description || 'None'}<br>
-                    <b>Reported By:</b> {{ session.get('username', 'You') }}<br>
-                    <b>Time:</b> Just now
+                    <div style="min-width: 200px;">
+                        <h6 class="text-warning mb-2"><i class="bi bi-exclamation-triangle"></i> Hazard Report</h6>
+                        <p class="mb-1"><strong>Category:</strong> ${category}</p>
+                        <p class="mb-1"><strong>Description:</strong> ${description || 'None'}</p>
+                        <p class="mb-1"><strong>Reported By:</strong> {{ session.get('username', 'You') }}</p>
+                        <p class="mb-0"><strong>Time:</strong> Just now</p>
+                    </div>
                 `);
 
                 map.removeLayer(selectedMarker);

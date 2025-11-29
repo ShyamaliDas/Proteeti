@@ -10,7 +10,7 @@
 
 
 
-<div id="resourcesMap" style="height: 500px; width: 95%; border-radius: 8px;"></div>
+<div id="resourcesMap" data-center-lat="{{ center_lat|tojson }}" data-center-lng="{{ center_lng|tojson }}" style="height: 500px; width: 95%; border-radius: 8px;"></div>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -355,8 +355,9 @@
         
     ];
 
-    const CENTER_LAT = {{ center_lat|tojson }};
-    const CENTER_LNG = {{ center_lng|tojson }};
+    const mapEl = document.getElementById('resourcesMap');
+    const CENTER_LAT = parseFloat(mapEl.dataset.centerLat) || 0;
+    const CENTER_LNG = parseFloat(mapEl.dataset.centerLng) || 0;
     const resourcesMap = L.map('resourcesMap').setView([CENTER_LAT, CENTER_LNG], 12);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(resourcesMap);

@@ -33,6 +33,29 @@
                         <li class="nav-item"><a class="nav-link" href="/network">Network</a></li>
                         <li class="nav-item"><a class="nav-link" href="/account">{{ session.get('username') }}</a></li>
                         <li class="nav-item"><a class="nav-link" href="/logout">Logout</a></li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link position-relative" href="#" id="notificationDropdown" 
+                              data-bs-toggle="dropdown" aria-expanded="false" onclick="loadNotifications()">
+                                <i class="bi bi-bell-fill"></i>
+                                <span id="notificationBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" 
+                                      style="display: none; font-size: 10px;">
+                                    0
+                                </span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationDropdown" 
+                                style="min-width: 350px; max-height: 400px; overflow-y: auto;">
+                                <li class="dropdown-header d-flex justify-content-between align-items-center">
+                                    <span><strong>Notifications</strong></span>
+                                    <button class="btn btn-sm btn-link" onclick="markAllRead()" style="font-size: 12px;">
+                                        Mark all read
+                                    </button>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <div id="notificationsList">
+                                    <li class="dropdown-item text-muted">Loading...</li>
+                                </div>
+                            </ul>
+                        </li>
                     {% else %}
                         <li class="nav-item"><a class="nav-link" href="/login">Login</a></li>
                         <li class="nav-item"><a class="nav-link" href="/register">Register</a></li>
@@ -54,38 +77,6 @@
 
     
 
-
-<script>
-document.getElementById('toggle-notifications').addEventListener('click', async function() {
-  const isSubscribed = await window.notificationManager.getSubscriptionStatus();
-  
-  if (isSubscribed) {
-    await window.notificationManager.unsubscribeFromNotifications();
-    this.textContent = 'Enable Notifications';
-    this.classList.remove('btn-primary');
-    this.classList.add('btn-outline-primary');
-  } else {
-    const success = await window.notificationManager.subscribeToNotifications();
-    if (success) {
-      this.textContent = 'Disable Notifications';
-      this.classList.remove('btn-outline-primary');
-      this.classList.add('btn-primary');
-    }
-  }
-});
-
-// Check subscription status on page load
-window.addEventListener('load', async () => {
-  const isSubscribed = await window.notificationManager.getSubscriptionStatus();
-  const button = document.getElementById('toggle-notifications');
-  
-  if (isSubscribed) {
-    button.textContent = 'Disable Notifications';
-    button.classList.remove('btn-outline-primary');
-    button.classList.add('btn-primary');
-  }
-});
-</script>
 
     <script>
         function showModal(id) {
@@ -305,6 +296,87 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 });
+
+async function loadNotifications() {
+    try {
+        const response = await fetch('/api/notifications/unread');
+        const data = await response.json();
+        
+        const badge = document.getElementById('notificationBadge');
+        const list = document.getElementById('notificationsList');
+        
+        if (data.count > 0) {
+            badge.textContent = data.count;
+            badge.style.display = 'block';
+            
+            list.innerHTML = data.notifications.map(notif => `
+                <li>
+                    <a class="dropdown-item ${notif.is_read ? '' : 'bg-light'}" 
+                       href="${notif.link || '#'}" 
+                       onclick="markAsRead(${notif.id})">
+                        <div class="d-flex align-items-start">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1" style="font-size: 14px;">${escapeHtml(notif.title)}</h6>
+                                <p class="mb-1 text-muted" style="font-size: 12px;">${escapeHtml(notif.message)}</p>
+                                <small class="text-muted">${timeAgo(notif.created_at)}</small>
+                            </div>
+                        </div>
+                    </a>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+            `).join('');
+        } else {
+            badge.style.display = 'none';
+            list.innerHTML = '<li class="dropdown-item text-muted">No new notifications</li>';
+        }
+    } catch (error) {
+        console.error('Error loading notifications:', error);
+    }
+}
+
+async function markAsRead(notifId) {
+    try {
+        await fetch('/api/notifications/mark-read', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({notification_id: notifId})
+        });
+        loadNotifications();
+    } catch (error) {
+        console.error('Error marking as read:', error);
+    }
+}
+
+async function markAllRead() {
+    try {
+        await fetch('/api/notifications/mark-all-read', {method: 'POST'});
+        loadNotifications();
+    } catch (error) {
+        console.error('Error marking all as read:', error);
+    }
+}
+
+function timeAgo(timestamp) {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const seconds = Math.floor((now - date) / 1000);
+    
+    if (seconds < 60) return 'Just now';
+    if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
+    if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
+    return Math.floor(seconds / 86400) + 'd ago';
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Poll for new notifications every 10 seconds
+setInterval(loadNotifications, 10000);
+loadNotifications();
+
 </script>
 
 

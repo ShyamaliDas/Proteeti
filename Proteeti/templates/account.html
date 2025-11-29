@@ -266,6 +266,12 @@
                 <span class="sidebar-icon"><i class="bi bi-people"></i></span>
                 <span>Trusted Contacts</span>
             </div>
+
+            <div class="sidebar-item" onclick="showSection('sos')">
+                <span class="sidebar-icon"><i class="bi bi-shield-exclamation"></i></span>
+                <span>SOS History</span>
+            </div>
+
             <div class="sidebar-item" onclick="showSection('consent')">
                 <span class="sidebar-icon"><i class="bi bi-shield-lock"></i></span>
                 <span>Consent & Preferences</span>
@@ -393,14 +399,131 @@
             {% endfor %}
             {% else %}
                 <div class="empty-state">
-                    <i class="fas fa-users"></i>
-                    <p>No trusted contacts added yet</p>
-                    <p class="small">Add connections in your safety network</p>
-                    <a href="{{ url_for('network') }}" class="btn btn-primary mt-3">
-                        <i class="fas fa-network-wired"></i> Go to Network
-                    </a>
                 </div>
             {% endif %}
+        </div>
+
+        <!-- SECTION: SOS History -->
+        <div class="content-section" id="section-sos">
+            <div class="content-header">
+                <h1>SOS History</h1>
+                <p>Manage your emergency alerts and safety incidents</p>
+            </div>
+
+            <!-- Active SOS Alerts -->
+            <div class="info-card">
+                <h4 class="mb-3" style="color: var(--bordeaux);">
+                    <i class="bi bi-exclamation-triangle-fill text-warning"></i> Active SOS Alerts
+                </h4>
+                
+                {% if active_sos %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Location</th>
+                                <th>Accuracy</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sos in active_sos %}
+                            <tr>
+                                <td>
+                                    <small>{{ sos.created_at }}</small>
+                                </td>
+                                <td>
+                                    <small>{{ "%.6f"|format(sos.lat) }}, {{ "%.6f"|format(sos.lng) }}</small>
+                                </td>
+                                <td>{{ sos.accuracy|round|int }}m</td>
+                                <td>
+                                    <span class="badge bg-danger">ACTIVE</span>
+                                </td>
+                                <td>
+                                    <button onclick="resolveSOS('{{ sos.id }}')" class="btn btn-success btn-sm">
+                                        <i class="bi bi-check-circle"></i> Mark Safe
+                                    </button>
+                                    <a href="/track_sos/{{ sos.id }}" class="btn btn-info btn-sm">
+                                        <i class="bi bi-map"></i> View Map
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="bi bi-check-circle-fill text-success" style="font-size: 3rem;"></i>
+                    <p class="mt-2 text-muted">No active SOS alerts</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Resolved SOS Alerts -->
+            <div class="info-card">
+                <h4 class="mb-3" style="color: var(--bordeaux);">
+                    <i class="bi bi-check-circle-fill text-success"></i> Resolved SOS Alerts
+                </h4>
+                
+                {% if resolved_sos %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Location</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sos in resolved_sos %}
+                            <tr>
+                                <td>
+                                    <small>{{ sos.created_at }}</small>
+                                </td>
+                                <td>
+                                    <small>{{ "%.6f"|format(sos.lat) }}, {{ "%.6f"|format(sos.lng) }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-success">RESOLVED</span>
+                                </td>
+                                <td>
+                                    <a href="/track_sos/{{ sos.id }}" class="btn btn-outline-info btn-sm">
+                                        <i class="bi bi-eye"></i> View History
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="bi bi-clock-history text-muted" style="font-size: 3rem;"></i>
+                    <p class="mt-2 text-muted">No resolved SOS alerts yet</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="info-card">
+                <h4 class="mb-3" style="color: var(--bordeaux);">Quick Actions</h4>
+                <div class="d-flex gap-3 flex-wrap">
+                    <a href="/sos" class="btn btn-danger">
+                        <i class="bi bi-shield-exclamation"></i> Send New SOS
+                    </a>
+                    <a href="/network" class="btn btn-primary">
+                        <i class="bi bi-people"></i> Manage Network
+                    </a>
+                    <a href="/map" class="btn btn-warning">
+                        <i class="bi bi-map"></i> View Hazard Map
+                    </a>
+                </div>
+            </div>
         </div>
 
         <!-- SECTION C: Consent & Preferences -->
@@ -439,6 +562,7 @@
                 </a>
             </div>
         </div>
+        
 
         <!-- SECTION D: Optional Info -->
         <div class="content-section" id="section-optional">
@@ -591,34 +715,80 @@ document.getElementById('contactForm')?.addEventListener('submit', async (e) => 
 });
 
 async function removeConnection(connectionId) {
-    if (!confirm('Are you sure you want to remove this connection?')) {
+    if (!confirm('Remove this connection?')) return;
+    
+    try {
+        const response = await fetch('/api/decline_connection', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({connection_id: connectionId})
+        });
+        
+        if (response.ok) {
+            alert('Connection removed');
+            location.reload();
+        } else {
+            alert('Error removing connection');
+        }
+    } catch (error) {
+        console.error('Remove error:', error);
+        alert('Error removing connection');
+    }
+}
+
+async function resolveSOS(sosId) {
+    console.log(`[DEBUG JS] resolveSOS called with ID: ${sosId}`);
+    
+    if (!confirm('Are you sure you want to mark this SOS as resolved?')) {
         return;
     }
 
     try {
-        const response = await fetch('/api/decline_connection', {
+        console.log(`[DEBUG JS] Preparing fetch request...`);
+        
+        // Make sure sosId is a number
+        const sosIdNum = parseInt(sosId);
+        console.log(`[DEBUG JS] SOS ID as number: ${sosIdNum}`);
+        
+        const requestBody = { sos_id: sosIdNum };
+        console.log(`[DEBUG JS] Request body:`, requestBody);
+        
+        const response = await fetch('/api/resolve_sos', {
             method: 'POST',
-            headers: {
+            headers: { 
                 'Content-Type': 'application/json',
+                'Accept': 'application/json'
             },
-            body: JSON.stringify({ connection_id: connectionId })
+            body: JSON.stringify(requestBody)
         });
 
-        const data = await response.json();
+        console.log(`[DEBUG JS] Got response, status: ${response.status}`);
+        
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        console.log(`[DEBUG JS] Content-Type: ${contentType}`);
+        
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error(`[DEBUG JS] Expected JSON but got:`, text.substring(0, 200));
+            throw new Error(`Server returned non-JSON response: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log(`[DEBUG JS] Parsed JSON result:`, result);
 
         if (response.ok) {
-            showMessage('Connection removed successfully!');
-            document.querySelector(`[data-contact-id="${connectionId}"]`)?.remove();
-
-            const contactsList = document.querySelectorAll('[data-contact-id]');
-            if (contactsList.length === 0) {
-                location.reload();
-            }
+            showMessage('SOS marked as safe!', false);
+            setTimeout(() => location.reload(true), 1500);
         } else {
-            showMessage(data.error || 'Failed to remove connection', true);
+            throw new Error(result.error || `Server error: ${response.status}`);
         }
+        
     } catch (error) {
-        showMessage('Error removing connection: ' + error.message, true);
+        console.error('[DEBUG JS] Full error:', error);
+        console.error('[DEBUG JS] Error name:', error.name);
+        console.error('[DEBUG JS] Error message:', error.message);
+        showMessage('Failed to resolve SOS: ' + error.message, true);
     }
 }
 </script>

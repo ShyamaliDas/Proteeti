@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from flask_dance.contrib.google import make_google_blueprint, google
 from flask_migrate import Migrate
@@ -5,7 +6,7 @@ from flask_login import login_required, current_user, LoginManager
 from flask import current_app
 from flask_sqlalchemy import SQLAlchemy
 import json, os, re, random, requests, smtplib
-from datetime import datetime
+from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
@@ -26,8 +27,8 @@ app.config.from_object(Config)
 
 # Provide a consistent "now" helper used across the code (bd_now was referenced but not defined)
 def bd_now():
-    return datetime.utcnow()
-
+    """Returns Bangladesh datetime OBJECT (UTC+6)"""
+    return datetime.now(timezone.utc) + timedelta(hours=6)
 
 
 # Initialize database
@@ -451,7 +452,100 @@ def account():
         "hazard_categories": []
     })
     
-    return render_template("account.html", user=info, username=username)
+    # ADD THIS: Fetch network connections
+    network_connections = []
+    
+    # Get accepted connections where user is requester
+    sent_connections = NetworkConnection.query.filter_by(
+        requester_id=user.id, 
+        status='accepted'
+    ).all()
+    
+    # Get accepted connections where user is recipient
+    received_connections = NetworkConnection.query.filter_by(
+        recipient_id=user.id, 
+        status='accepted'
+    ).all()
+    
+    # Build network list
+    for conn in sent_connections:
+        contact = User.query.get(conn.recipient_id)
+        if contact:
+            network_connections.append({
+                'connection_id': conn.id,
+                'username': contact.username,
+                'email': contact.email,
+                'status': 'connected'
+            })
+    
+    for conn in received_connections:
+        contact = User.query.get(conn.requester_id)
+        if contact:
+            network_connections.append({
+                'connection_id': conn.id,
+                'username': contact.username,
+                'email': contact.email,
+                'status': 'connected'
+            })
+    
+    # Legacy contacts from old JSON field (if any)
+    legacy_contacts = user.trusted_contacts if user.trusted_contacts else []
+    
+    active_sos = SOSAlert.query.filter_by(
+        user_id=user.id, 
+        status='active'
+    ).order_by(SOSAlert.created_at.desc()).all()
+    
+    resolved_sos = SOSAlert.query.filter_by(
+        user_id=user.id,
+        status='resolved'  # Only resolved, not 'historical'
+    ).order_by(SOSAlert.created_at.desc()).limit(20).all()
+
+    return render_template("account.html", 
+                         user=info, 
+                         username=username,
+                         network_connections=network_connections,
+                         legacy_contacts=legacy_contacts,
+                         active_sos=active_sos,
+                         resolved_sos=resolved_sos)
+
+@app.route("/api/resolve_sos", methods=["POST"])
+def resolve_sos():
+    """Mark SOS as resolved"""
+    try:
+        if not session.get("loggedin"):
+            return jsonify({"error": "Not logged in"}), 401
+        
+        data = request.get_json()
+        sos_id = int(data.get("sos_id"))
+        
+        sos = SOSAlert.query.get(sos_id)
+        
+        if not sos:
+            return jsonify({"error": "SOS not found"}), 404
+        
+        current_user = User.query.filter_by(username=session.get("username")).first()
+        
+        if not current_user or sos.user_id != current_user.id:
+            return jsonify({"error": "Unauthorized"}), 403
+        
+        # Update SOS status
+        sos.status = 'resolved'
+        sos.is_live = False
+        sos.resolved_by = current_user.username
+        sos.resolved_at = bd_now()
+        sos.last_updated = bd_now()
+        
+        db.session.commit()
+        
+        return jsonify({"message": "SOS marked as safe!"}), 200
+        
+    except Exception as e:
+        print(f"[ERROR] Resolve SOS failed: {e}")
+        import traceback
+        traceback.print_exc()
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/update_account", methods=["POST"])
 def update_account():
@@ -725,11 +819,9 @@ def edit_profile():
     return render_template("edit_profile.html", user=user)
 
 
-
 @app.route("/send_sos", methods=["POST"])
 def send_sos():
-    """Send immediate location-based SOS alert"""
-    
+    """Send immediate location-based SOS alert with accuracy validation"""
     try:
         if not session.get("loggedin"):
             return jsonify({"error": "Please login first"}), 401
@@ -739,17 +831,35 @@ def send_sos():
         longitude = data.get("longitude")
         accuracy = data.get("accuracy")
 
-        # Validate received coordinates
         if latitude is None or longitude is None:
             return jsonify({"error": "Location required"}), 400
+        
         try:
             lat_f = float(latitude)
             lng_f = float(longitude)
+            accuracy_f = float(accuracy) if accuracy else 50.0
         except Exception:
             return jsonify({"error": "Invalid coordinates"}), 400
+        
+        # ✅ ACCURACY VALIDATION
+        if accuracy_f > 1000:
+            return jsonify({
+                "error": "Location accuracy too low",
+                "accuracy": accuracy_f,
+                "message": "Please move outdoors and try again. GPS needs clear sky view."
+            }), 400
+        
+        # Warn if accuracy is poor (but still accept)
+        warning = None
+        if accuracy_f > 200:
+            warning = f"Location accuracy is {int(accuracy_f)}m - position is approximate"
+        
+        # Log accuracy for monitoring
+        print(f"[SOS] Accuracy: {accuracy_f}m (acceptable: {accuracy_f <= 1000})")
+        
+        # Validate coordinates are reasonable (world bounds)
         if not (-90 <= lat_f <= 90 and -180 <= lng_f <= 180):
             return jsonify({"error": "Invalid location coordinates"}), 400
-        
 
         username = session.get("username")
         user = User.query.filter_by(username=username).first()
@@ -757,29 +867,67 @@ def send_sos():
         if not user:
             return jsonify({"error": "User not found"}), 404
 
+        # Create SOS alert
         sos_alert = SOSAlert(
             user_id=user.id,
             username=username,
             lat=lat_f,
             lng=lng_f,
-            accuracy=accuracy or 0,
-            status='active'
+            accuracy=accuracy_f,
+            status='active',
+            is_live=True  # Enable live tracking
         )
         db.session.add(sos_alert)
         db.session.commit()
 
+        print(f"[SOS] Created alert {sos_alert.id} - Location: {lat_f}, {lng_f} (±{accuracy_f}m)")
+
+        # Send emails
         send_sos_email_with_location(user, lat_f, lng_f)
 
+        # Notify network
+        connections = NetworkConnection.query.filter(
+            ((NetworkConnection.requester_id == user.id) | (NetworkConnection.recipient_id == user.id)),
+            NetworkConnection.status == 'accepted'
+        ).all()
+        
+        for conn in connections:
+            other_user_id = conn.recipient_id if conn.requester_id == user.id else conn.requester_id
+            create_notification(
+                user_id=other_user_id,
+                type='sos_alert',
+                title=f'🚨 SOS ALERT from {username}',
+                message=f'{username} needs immediate help! Click to track their location.',
+                link=f'/track_sos/{sos_alert.id}',
+                data={
+                    'sos_id': sos_alert.id,
+                    'latitude': lat_f,
+                    'longitude': lng_f,
+                    'accuracy': accuracy_f,
+                    'username': username
+                }
+            )
+
         return jsonify({
-            "message": "Location SOS sent. Recording audio...",
-            "status": "success",
-            "alert_id": sos_alert.id
+            "message": "SOS alert sent successfully",
+            "status": "success", 
+            "alert_id": sos_alert.id,
+            "location": {
+                "lat": lat_f,
+                "lng": lng_f,
+                "accuracy": accuracy_f
+            },
+            "warning": warning  # Include warning if accuracy is poor
         }), 200
 
     except Exception as e:
-        print(f"[DEBUG] SOS error: {e}")
+        print(f"[SOS] Error: {e}")
+        import traceback
+        traceback.print_exc()
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+
+
 
 # ============= NETWORK CONNECTION ROUTES =============
 
@@ -1056,6 +1204,42 @@ def get_network_sos():
     return jsonify([sos.to_dict() for sos in active_sos])
 
 
+@app.route("/api/map_sos_alerts")
+def get_map_sos_alerts():
+    """Get ALL SOS alerts for the safety map"""
+    try:
+        print("[DEBUG] map_sos_alerts endpoint called!")
+        
+        # Get real data from database
+        all_sos = SOSAlert.query.order_by(SOSAlert.created_at.desc()).limit(50).all()
+        print(f"[DEBUG] Found {len(all_sos)} SOS alerts in database")
+        
+        alerts_data = []
+        for sos in all_sos:
+            alerts_data.append({
+                'id': sos.id,
+                'username': sos.username,
+                'lat': float(sos.lat) if sos.lat else 0,
+                'lng': float(sos.lng) if sos.lng else 0,
+                'accuracy': float(sos.accuracy) if sos.accuracy else 20,
+                'status': str(sos.status) if sos.status else 'unknown',
+                'created_at': str(sos.created_at) if sos.created_at else '',
+                'last_updated': str(sos.last_updated) if sos.last_updated else '',
+                'is_live': bool(sos.is_live) if sos.is_live is not None else False
+            })
+        
+        active_count = len([a for a in alerts_data if a['status'] == 'active'])
+        resolved_count = len([a for a in alerts_data if a['status'] == 'resolved'])
+        
+        print(f"[DEBUG] Returning {len(alerts_data)} alerts: {active_count} active, {resolved_count} resolved")
+        return jsonify(alerts_data), 200
+        
+    except Exception as e:
+        print(f"[DEBUG] ERROR in map_sos_alerts: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": "Server error"}), 500
+
 @app.route("/api/update_sos_location", methods=["POST"])
 def update_sos_location():
     """Update live location for active SOS"""
@@ -1091,26 +1275,36 @@ def update_sos_location():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/track/<int:sos_id>")
+@app.route("/track_sos/<int:sos_id>")
 def track_sos(sos_id):
-    """Live tracking page for SOS alert"""
+    """Page to track a specific SOS alert"""
     if not session.get("loggedin"):
-        return redirect(url_for("login"))
+        return redirect("/login")
     
-    sos = SOSAlert.query.get_or_404(sos_id)
+    sos = SOSAlert.query.get(sos_id)
+    if not sos:
+        return "SOS alert not found", 404
+    
+    # Check if user has permission to view this SOS
     current_user = User.query.filter_by(username=session.get("username")).first()
     
-    # Check if you're in their network
+    if sos.user_id == current_user.id:
+        # User is the one who sent the SOS
+        return render_template("track_sos.html", sos=sos)
+    
+    # Check if users are connected
+    from models.user import NetworkConnection
     connection = NetworkConnection.query.filter(
         ((NetworkConnection.requester_id == current_user.id) & (NetworkConnection.recipient_id == sos.user_id)) |
         ((NetworkConnection.requester_id == sos.user_id) & (NetworkConnection.recipient_id == current_user.id)),
         NetworkConnection.status == 'accepted'
     ).first()
     
-    if not connection and sos.user_id != current_user.id:
-        return "Unauthorized", 403
-    
-    return render_template("track_sos.html", sos=sos)
+    if connection:
+        return render_template("track_sos.html", sos=sos)
+    else:
+        return "You don't have permission to view this SOS", 403
+
 
 
 @app.route("/send_sos_audio", methods=["POST"])
@@ -1163,9 +1357,6 @@ def sos():
 def get_sos_alerts():
     sos_alerts = SOSAlert.query.all()
     return jsonify([alert.to_dict() for alert in sos_alerts])
-
-
-
 
 
 @app.route("/map")
@@ -1376,15 +1567,28 @@ def get_admin_users():
     check = require_admin_api()
     if check: return check
     
-    users = User.query.all()
-    return jsonify([{
-        "id": u.id,
-        "username": u.username,
-        "email": u.email,
-        "verified": u.verified,
-        "trusted_contacts_count": len(u.trusted_contacts) if u.trusted_contacts else 0,
-        "created_at": u.created_at.isoformat() if hasattr(u, 'created_at') else None
-    } for u in users])
+    try:
+        users = User.query.with_entities(
+            User.id,
+            User.username,
+            User.email,
+            User.verified,
+            User.created_at,
+            User.legacy_contacts
+        ).order_by(User.created_at.desc()).all()  # Most recent first
+        
+        return jsonify([{
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "verified": u.verified,
+            "trusted_contacts_count": len(u.legacy_contacts) if u.legacy_contacts else 0,
+            "created_at": u.created_at  
+        } for u in users])
+    
+    except Exception as e:
+        print(f"[ERROR] get_admin_users: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/admin/reports/<int:report_id>", methods=["DELETE"])
 def delete_admin_report(report_id):
@@ -1570,72 +1774,67 @@ def delete_own_admin_account():
     
 @app.route("/api/admin/analytics/overview")
 def get_analytics_overview():
-    """Get overview analytics for admin dashboard"""
+    """Get overview analytics for admin dashboard - OPTIMIZED"""
     check = require_admin_api()
     if check: return check
     
     try:
-        from datetime import timedelta
         from sqlalchemy import func
         
-        now = datetime.utcnow()
-        week_ago = now - timedelta(days=7)
+        # Single optimized query for counts
+        total_users = db.session.query(func.count(User.id)).scalar() or 0
+        verified_users = db.session.query(func.count(User.id)).filter(User.verified == True).scalar() or 0
+        total_reports = db.session.query(func.count(Report.id)).scalar() or 0
+        active_sos = db.session.query(func.count(SOSAlert.id)).filter(SOSAlert.status == 'active').scalar() or 0
         
-        # Count stats
-        total_users = User.query.count()
-        verified_users = User.query.filter_by(verified=True).count()
-        total_reports = Report.query.count()
-        active_sos = SOSAlert.query.filter_by(status='active').count()
-        
-        # Recent activity (last 7 days)
-        recent_reports = Report.query.filter(Report.timestamp >= week_ago).count()
-        recent_users = User.query.filter(User.created_at >= week_ago).count()
-        
-        # Reports by category
+        # Reports by category - optimized
         category_counts = db.session.query(
             Report.category, 
             func.count(Report.id)
         ).group_by(Report.category).all()
         
-        categories = [{"category": cat, "count": count} for cat, count in category_counts]
+        categories = [{"category": cat or "Unknown", "count": count} for cat, count in category_counts]
         
         return jsonify({
             "total_users": total_users,
             "verified_users": verified_users,
             "total_reports": total_reports,
             "active_sos": active_sos,
-            "recent_reports": recent_reports,
-            "recent_users": recent_users,
+            "recent_reports": 0,  # Optional: add if needed
+            "recent_users": 0,    # Optional: add if needed
             "categories": categories
         }), 200
     
     except Exception as e:
+        print(f"[ERROR] analytics/overview: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
     
 @app.route("/api/admin/analytics/trends")
 def get_trends():
-    """Get 7-day trends for reports and SOS"""
+    """Get 7-day trends - OPTIMIZED"""
     check = require_admin_api()
     if check: return check
     
     try:
-        from datetime import timedelta
-        from sqlalchemy import func, cast, Date
+        from sqlalchemy import func
+        from datetime import datetime, timedelta
         
-        now = datetime.utcnow()
-        week_ago = now - timedelta(days=7)
+        # Get last 7 days of data
+        seven_days_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
         
-        # Reports by day (last 7 days)
+        # Reports trend - optimized query
         report_trends = db.session.query(
-            cast(Report.timestamp, Date).label('date'),
+            func.substr(Report.timestamp, 1, 10).label('date'),
             func.count(Report.id).label('count')
-        ).filter(Report.timestamp >= week_ago).group_by('date').all()
+        ).filter(Report.timestamp >= seven_days_ago).group_by('date').all()
         
-        # SOS by day (last 7 days)
+        # SOS trend - optimized query
         sos_trends = db.session.query(
-            cast(SOSAlert.created_at, Date).label('date'),
+            func.substr(SOSAlert.created_at, 1, 10).label('date'),
             func.count(SOSAlert.id).label('count')
-        ).filter(SOSAlert.created_at >= week_ago).group_by('date').all()
+        ).filter(SOSAlert.created_at >= seven_days_ago).group_by('date').all()
         
         # Format data
         report_data = [{"date": str(date), "count": count} for date, count in report_trends]
@@ -1647,6 +1846,9 @@ def get_trends():
         }), 200
     
     except Exception as e:
+        print(f"[ERROR] trends: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/admin/analytics/heatmap-data")
@@ -1706,6 +1908,85 @@ def rate():
         db.session.add(sr)
     db.session.commit()
     return jsonify({'message': f'Your rating ({rating} stars) has been saved.'}), 200
+
+
+@app.route("/api/notifications/unread")
+def get_unread_notifications():
+    """Get unread notifications for current user"""
+    if not session.get("loggedin"):
+        return jsonify({"error": "Not logged in"}), 401
+    
+    username = session.get("username")
+    user = User.query.filter_by(username=username).first()
+    
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    from models.user import Notification
+    notifications = Notification.query.filter_by(
+        user_id=user.id,
+        is_read=False
+    ).order_by(Notification.created_at.desc()).limit(10).all()
+    
+    return jsonify({
+        "count": len(notifications),
+        "notifications": [n.to_dict() for n in notifications]
+    }), 200
+
+@app.route("/api/notifications/mark-read", methods=["POST"])
+def mark_notification_read():
+    """Mark notification as read"""
+    if not session.get("loggedin"):
+        return jsonify({"error": "Not logged in"}), 401
+    
+    data = request.get_json()
+    notif_id = data.get("notification_id")
+    
+    from models.user import Notification
+    notification = Notification.query.get(notif_id)
+    
+    if notification:
+        notification.is_read = True
+        db.session.commit()
+        return jsonify({"message": "Marked as read"}), 200
+    
+    return jsonify({"error": "Notification not found"}), 404
+
+@app.route("/api/notifications/mark-all-read", methods=["POST"])
+def mark_all_read():
+    """Mark all notifications as read"""
+    if not session.get("loggedin"):
+        return jsonify({"error": "Not logged in"}), 401
+    
+    username = session.get("username")
+    user = User.query.filter_by(username=username).first()
+    
+    from models.user import Notification
+    Notification.query.filter_by(
+        user_id=user.id,
+        is_read=False
+    ).update({"is_read": True})
+    
+    db.session.commit()
+    return jsonify({"message": "All marked as read"}), 200
+
+# Helper function to create notifications
+def create_notification(user_id, type, title, message, link=None, data=None):
+    """Create a new notification for a user"""
+    from models.user import Notification
+    
+    notification = Notification(
+        user_id=user_id,
+        type=type,
+        title=title,
+        message=message,
+        link=link,
+        data=data or {}
+    )
+    
+    db.session.add(notification)
+    db.session.commit()
+    return notification
 
 
 if __name__ == "__main__":

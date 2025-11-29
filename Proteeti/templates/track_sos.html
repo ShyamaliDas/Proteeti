@@ -2,61 +2,125 @@
 {% block content %}
 <!-- Load Leaflet for map functionality -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<!-- Load Tailwind CSS for utility classes on modals/buttons -->
 <script src="https://cdn.tailwindcss.com"></script>
 
 <style>
-    /* Base map and layout styles */
-    html, body { margin:0; padding:0; height:100%; width:100%; }
-    /* Adjusted height to account for navbar/footer if they exist in base.html */
-    #map { height: calc(100vh - 80px); width:100%; }
+    body {
+        overflow-x: hidden;
+    }
+    
+    .map-wrapper {
+        position: relative;
+        width: 100%;
+        height: calc(100vh - 80px);
+        margin-top: 0;
+    }
+    
+    #map { 
+        height: 100%;
+        width: 100%;
+        position: relative;
+        z-index: 1;
+    }
 
-    /* Info Panel Styling (Glassmorphism/Dark Theme) */
     .info-panel {
         position: absolute;
-        top: 80px;
+        top: 20px;
         left: 15px;
         background: rgba(0,0,0,0.85);
         color: white;
         padding: 14px 20px;
         border-radius: 14px;
         z-index: 1000;
-        font-family: system-ui, -apple-system, sans-serif;
         backdrop-filter: blur(12px);
         box-shadow: 0 8px 32px rgba(0,0,0,0.5);
         min-width: 220px;
-        transition: transform 0.3s ease;
     }
-    .username { font-size: 22px; font-weight: bold; margin-bottom: 6px; }
-    .detail { font-size: 14px; opacity: 0.9; margin-bottom: 4px; }
+    
+    .username { 
+        font-size: 22px; 
+        font-weight: bold; 
+        margin-bottom: 6px;
+        color: #ef4444;
+    }
+    
+    .username.resolved {
+        color: #10b981;
+    }
+    
+    .detail { 
+        font-size: 14px; 
+        opacity: 0.9; 
+        margin-bottom: 4px; 
+    }
 
-    /* SOS Marker Pulsing Animation */
-    @keyframes pulse {
+    .status-color-resolved {
+        color: #10b981;
+        font-weight: bold;
+    }
+
+    .status-color-active {
+        color: #ef4444;
+        font-weight: bold;
+    }
+
+    /* Active SOS Marker - Red Pulsing */
+    @keyframes pulse-red {
         0% { box-shadow: 0 0 0 0 rgba(220,38,38,0.8); }
         70% { box-shadow: 0 0 0 25px rgba(220,38,38,0); }
         100% { box-shadow: 0 0 0 0 rgba(220,38,38,0); }
     }
+    
     .sos-marker {
-        width: 34px; height: 34px;
-        background: #dc2626; /* red-600 */
+        width: 34px;
+        height: 34px;
+        background: #dc2626;
         border: 4px solid white;
         border-radius: 50%;
-        animation: pulse 2s infinite;
+        animation: pulse-red 2s infinite;
         position: relative;
     }
+    
     .sos-marker::after {
         content: '';
         position: absolute;
-        top: 50%; left: 50%;
-        width: 14px; height: 14px;
+        top: 50%;
+        left: 50%;
+        width: 14px;
+        height: 14px;
         background: white;
         border-radius: 50%;
         transform: translate(-50%, -50%);
     }
 
-    /* Action Panel Styling */
+    /* Resolved SOS Marker - Green Checkmark */
+    @keyframes pulse-green {
+        0% { box-shadow: 0 0 0 0 rgba(16,185,129,0.6); }
+        70% { box-shadow: 0 0 0 20px rgba(16,185,129,0); }
+        100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+    }
+    
+    .sos-marker.resolved {
+        background: #10b981;
+        animation: pulse-green 3s infinite;
+    }
+    
+    .sos-marker.resolved::after {
+        content: '✓';
+        background: transparent;
+        color: white;
+        font-size: 20px;
+        font-weight: bold;
+        width: auto;
+        height: auto;
+        border-radius: 0;
+        line-height: 1;
+        top: 48%;
+        left: 50%;
+    }
+
     .action-panel {
         position: absolute;
         bottom: 20px;
@@ -65,8 +129,10 @@
         z-index: 1000;
         display: flex;
         gap: 10px;
+        flex-wrap: wrap;
+        justify-content: center;
     }
-    /* Action button base style - using custom style overrides for sleek look */
+    
     .action-btn {
         background: rgba(0,0,0,0.85);
         color: white;
@@ -78,69 +144,162 @@
         backdrop-filter: blur(12px);
         transition: all 0.3s;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
     }
+    
     .action-btn:hover {
         background: white;
         color: #000;
+        transform: translateY(-2px);
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
     }
+    
     .action-btn.danger {
-        background: #dc2626; /* red-600 */
+        background: #dc2626;
         border-color: white;
     }
+    
     .action-btn.danger:hover {
-        background: #991b1b; /* red-800 */
+        background: #991b1b;
+        color: white;
     }
 
-    /* Custom Modal Overrides for positioning */
+    .status-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-left: 8px;
+    }
+    
+    .status-active {
+        background: #dc2626;
+        color: white;
+        animation: pulse-text 2s infinite;
+    }
+    
+    .status-resolved {
+        background: #10b981;
+        color: white;
+    }
+    
+    @keyframes pulse-text {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+
     .custom-modal-backdrop {
         position: fixed;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background-color: rgba(0, 0, 0, 0.7);
-        z-index: 2000;
-        display: none; /* Hidden by default */
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.8);
+        z-index: 10001;
+        display: none;
         align-items: center;
         justify-content: center;
+        padding: 20px;
+        box-sizing: border-box;
     }
+
     .custom-modal-content {
         background-color: white;
         border-radius: 12px;
         padding: 24px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
         max-width: 400px;
-        width: 90%;
+        width: 100%;
         text-align: center;
-        z-index: 2001;
+        position: relative;
+        z-index: 10005;
+    }
+    
+    @media (max-width: 768px) {
+        .info-panel {
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            min-width: unset;
+            font-size: 14px;
+        }
+        
+        .action-panel {
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            transform: none;
+        }
+        
+        .action-btn {
+            flex: 1;
+            min-width: 100px;
+        }
     }
 </style>
 
-<div id="map"></div>
+<div class="map-wrapper">
+    <div id="map"></div>
+    
+    <!-- Info Panel -->
+    <div class="info-panel">
+        <div class="detail">
+            <strong>Status:</strong> 
+            <span class="{% if sos.status == 'resolved' %}status-color-resolved{% else %}status-color-active{% endif %}">
+                {% if sos.status == 'resolved' %}RESOLVED{% else %}ACTIVE SOS{% endif %}
+            </span>
+        </div>
+            <span class="status-badge {% if sos.status == 'resolved' %}status-resolved{% else %}status-active{% endif %}">
+                {% if sos.status == 'resolved' %}RESOLVED{% else %}LIVE{% endif %}
+            </span>
+        </div>
+        <div class="detail">
+            <strong>Status:</strong> 
+            <span class="{% if sos.status == 'resolved' %}status-color-resolved{% else %}status-color-active{% endif %}" style="font-weight: bold;">
+                {% if sos.status == 'resolved' %}RESOLVED{% else %}ACTIVE SOS{% endif %}
+            </span>
+        </div>
+        <div class="detail">
+            <strong>Last updated:</strong> 
+            <span id="lastUpdate">Just now</span>
+        </div>
+        <div class="detail">
+            <strong>Accuracy:</strong> 
+            <span id="accuracy">{{ sos.accuracy|round|int if sos.accuracy else 20 }}</span> m
+        </div>
+        <div class="detail" style="margin-top: 8px; font-size: 12px; opacity: 0.7;">
+            Started: {{ sos.created_at }}
+        </div>
+        {% if sos.status == 'resolved' and sos.resolved_at %}
+        <div class="detail" style="font-size: 12px; opacity: 0.7;">
+            Resolved: {{ sos.resolved_at }}
+        </div>
+        {% endif %}
+    </div>
 
-<!-- Info Panel -->
-<div class="info-panel">
-    <div class="username">🚨 {{ sos.username }}</div>
-    <div class="detail">Status: <span style="color: #ef4444; font-weight: bold;">ACTIVE SOS</span></div>
-    <div class="detail">Last updated: <span id="lastUpdate">Just now</span></div>
-    <div class="detail">Accuracy: <span id="accuracy">{% if sos.accuracy %}{{ sos.accuracy|round|int }}{% else %}20{% endif %}</span> m</div>
-    <div class="detail" style="margin-top: 8px; font-size: 12px; opacity: 0.7;">
-        Started: {{ sos.created_at }}
+    <!-- Action Panel -->
+    <div class="action-panel">
+        {% if sos.status != 'resolved' %}
+        <button class="action-btn danger" onclick="confirmCallEmergency()">
+            <i class="bi bi-telephone-fill"></i> Call 999
+        </button>
+        {% endif %}
+        <button class="action-btn" onclick="navigateToLocation()">
+            <i class="bi bi-map-fill"></i> Navigate
+        </button>
+        <button class="action-btn" onclick="shareLocation()">
+            <i class="bi bi-share-fill"></i> Share
+        </button>
+        <button class="action-btn" onclick="window.location.href='/account'">
+            <i class="bi bi-house-fill"></i> Back to Account
+        </button>
     </div>
 </div>
 
-<!-- Action Panel -->
-<div class="action-panel">
-    <button class="action-btn danger" onclick="confirmCallEmergency()">
-        📞 Call 999
-    </button>
-    <button class="action-btn" onclick="navigateToLocation()">
-        🗺️ Navigate
-    </button>
-    <button class="action-btn" onclick="shareLocation()">
-        📤 Share
-    </button>
-</div>
-
-<!-- Custom Confirmation Modal (Replace window.confirm) -->
+<!-- Custom Confirmation Modal -->
 <div id="confirmModal" class="custom-modal-backdrop">
     <div class="custom-modal-content">
         <h3 class="text-xl font-bold mb-4" id="confirmTitle">Confirm Action</h3>
@@ -152,7 +311,7 @@
     </div>
 </div>
 
-<!-- Custom Alert Modal (Replace window.alert) -->
+<!-- Custom Alert Modal -->
 <div id="alertModal" class="custom-modal-backdrop">
     <div class="custom-modal-content">
         <h3 class="text-xl font-bold mb-4" id="alertTitle">Notification</h3>
@@ -161,20 +320,27 @@
     </div>
 </div>
 
-
 <script>
-// Utility for showing custom modals (replacing window.alert)
+// Global modal functions
 function customAlert(message, title = 'Notification') {
     const modal = document.getElementById('alertModal');
     document.getElementById('alertTitle').textContent = title;
     document.getElementById('alertMessage').textContent = message;
     modal.style.display = 'flex';
-    document.getElementById('alertClose').onclick = () => {
+    
+    const closeModal = () => {
         modal.style.display = 'none';
+        modal.onclick = null;
+        document.getElementById('alertClose').onclick = null;
     };
+    
+    modal.onclick = (e) => {
+        if (e.target === modal) closeModal();
+    };
+    
+    document.getElementById('alertClose').onclick = closeModal;
 }
 
-// Utility for showing custom confirmation (replacing window.confirm)
 function customConfirm(message, title = 'Confirm Action') {
     return new Promise(resolve => {
         const modal = document.getElementById('confirmModal');
@@ -182,236 +348,238 @@ function customConfirm(message, title = 'Confirm Action') {
         document.getElementById('confirmMessage').textContent = message;
         modal.style.display = 'flex';
 
-        const yesBtn = document.getElementById('confirmYes');
-        const noBtn = document.getElementById('confirmNo');
-
-        const close = (result) => {
-            yesBtn.onclick = null;
-            noBtn.onclick = null;
+        const closeModal = (result) => {
             modal.style.display = 'none';
             resolve(result);
+            modal.onclick = null;
+            document.getElementById('confirmYes').onclick = null;
+            document.getElementById('confirmNo').onclick = null;
         };
 
-        yesBtn.onclick = () => close(true);
-        noBtn.onclick = () => close(false);
+        modal.onclick = (e) => {
+            if (e.target === modal) closeModal(false);
+        };
+
+        document.getElementById('confirmYes').onclick = () => closeModal(true);
+        document.getElementById('confirmNo').onclick = () => closeModal(false);
     });
 }
 
-
-(function() {
-    // Safely extract data from template using data attributes
-    var sosData = {
-        id: parseInt('{{ sos.id }}'),
-        lat: parseFloat('{{ sos.lat }}'),
-        lng: parseFloat('{{ sos.lng }}'),
-        accuracy: parseFloat('{% if sos.accuracy %}{{ sos.accuracy }}{% else %}20{% endif %}'),
-        username: '{{ sos.username }}' // Keep as string
-    };
-
-    var currentLat = sosData.lat;
-    var currentLng = sosData.lng;
-    let map = null;
-    let marker = null;
-    let accuracyCircle = null;
-    let updateInterval = null;
-
-    // Validate coordinates and initialize map
-    if (!sosData.lat || !sosData.lng || isNaN(sosData.lat) || isNaN(sosData.lng)) {
-        document.getElementById('map').innerHTML = 
-            '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:red;font-size:20px;">❌ Invalid location data</div>';
-        return;
+// Global action functions
+window.confirmCallEmergency = async function() {
+    const shouldCall = await customConfirm(
+        'You are about to call 999 (Emergency Services). Do NOT call unless it is a genuine emergency.',
+        'Confirm Emergency Call'
+    );
+    if (shouldCall) {
+        window.location.href = 'tel:999';
     }
+};
 
-    // Initialize map
-    map = L.map('map').setView([sosData.lat, sosData.lng], 17);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors',
-        maxZoom: 19
-    }).addTo(map);
-
-    // Create pulsing SOS marker
-    var sosIcon = L.divIcon({
-        className: 'sos-marker-container',
-        html: '<div class="sos-marker"></div>',
-        iconSize: [34, 34],
-        iconAnchor: [17, 17]
-    });
-
-    marker = L.marker([sosData.lat, sosData.lng], { icon: sosIcon }).addTo(map);
-    marker.bindPopup('<strong>🚨 ' + sosData.username + '</strong><br>SOS Active').openPopup();
-
-    // Accuracy circle
-    accuracyCircle = L.circle([sosData.lat, sosData.lng], {
-        radius: sosData.accuracy,
-        color: '#dc2626',
-        fillColor: '#dc2626',
-        fillOpacity: 0.15,
-        weight: 2
-    }).addTo(map);
-
-    // Live update function
-    function updateLocation() {
-        // Implement exponential backoff for API calls if needed, but for simplicity, we'll use a direct fetch here.
-        fetch('/api/network_sos')
-            .then(function(response) {
-                if (!response.ok) {
-                    throw new Error('Failed to fetch SOS data');
-                }
-                return response.json();
-            })
-            .then(function(alerts) {
-                var currentSos = alerts.find(function(s) { return s.id === sosData.id; });
-                
-                if (!currentSos) {
-                    console.log('SOS not found in active alerts');
-                    document.getElementById('lastUpdate').textContent = 'SOS Ended';
-                    document.getElementById('lastUpdate').style.color = '#fbbf24';
-                    clearInterval(updateInterval); // Stop updates
-                    return;
-                }
-                
-                if (currentSos.status !== 'active') {
-                    document.getElementById('lastUpdate').textContent = 'SOS Resolved';
-                    document.getElementById('lastUpdate').style.color = '#10b981';
-                    clearInterval(updateInterval); // Stop updates
-                    
-                    // Use customConfirm instead of window.confirm
-                    setTimeout(async function() {
-                        const shouldReturn = await customConfirm(
-                            'This SOS has been resolved. Return to network page?',
-                            'SOS Resolved'
-                        );
-                        if (shouldReturn) {
-                            window.location.href = '/network';
-                        }
-                    }, 2000);
-                    return;
-                }
-                
-                var newLat = parseFloat(currentSos.lat);
-                var newLng = parseFloat(currentSos.lng);
-                var newAccuracy = currentSos.accuracy || 20;
-                
-                // Check if location changed and coordinates are valid
-                if (newLat && newLng && !isNaN(newLat) && !isNaN(newLng) && (newLat !== currentLat || newLng !== currentLng)) {
-                    currentLat = newLat;
-                    currentLng = newLng;
-                    
-                    // Smoothly update map
-                    map.setView([newLat, newLng], 17, { 
-                        animate: true, 
-                        duration: 1.2 
-                    });
-                    
-                    marker.setLatLng([newLat, newLng]);
-                    accuracyCircle.setLatLng([newLat, newLng]);
-                    accuracyCircle.setRadius(newAccuracy);
-                    
-                    // Update popup
-                    marker.setPopupContent(
-                        '<strong>🚨 ' + sosData.username + '</strong><br>' +
-                        'Location Updated<br>' +
-                        '<small>' + newLat.toFixed(6) + ', ' + newLng.toFixed(6) + '</small>'
-                    ).openPopup();
-                    
-                    console.log('Location updated:', newLat, newLng);
-                }
-                
-                // Update UI
-                var now = new Date();
-                document.getElementById('lastUpdate').textContent = now.toLocaleTimeString();
-                document.getElementById('lastUpdate').style.color = 'white';
-                document.getElementById('accuracy').textContent = Math.round(newAccuracy);
-            })
-            .catch(function(error) {
-                console.error('Update error:', error);
-                document.getElementById('lastUpdate').textContent = 'Connection error';
-                document.getElementById('lastUpdate').style.color = '#ef4444';
-            });
-    }
-
-    // Make functions global for onclick handlers
-
-    // Function to handle the confirmation before calling emergency services
-    window.confirmCallEmergency = async function() {
-        const shouldCall = await customConfirm(
-            'You are about to call 999 (Emergency Services in Bangladesh). Do NOT call unless it is a genuine emergency.',
-            'Confirm Emergency Call'
-        );
-        if (shouldCall) {
-            window.location.href = 'tel:999';
-        }
-    };
-
-    window.navigateToLocation = function() {
+window.navigateToLocation = function() {
+    if (window.currentLat && window.currentLng) {
         var url = 'https://www.google.com/maps/dir/?api=1&destination=' + 
-                    currentLat + ',' + currentLng + '&travelmode=driving';
+                    window.currentLat + ',' + window.currentLng + '&travelmode=driving';
         window.open(url, '_blank');
-    };
+    } else {
+        customAlert('Location not available yet.');
+    }
+};
 
-    window.shareLocation = function() {
-        var text = '🚨 EMERGENCY! ' + sosData.username + ' needs help!\n' +
-                    'Location: https://www.google.com/maps?q=' + currentLat + ',' + currentLng;
+window.shareLocation = function() {
+    if (window.currentLat && window.currentLng && window.sosData) {
+        var text = '🚨 EMERGENCY! ' + window.sosData.username + ' needs help!\n' +
+                    'Location: https://www.google.com/maps?q=' + window.currentLat + ',' + window.currentLng;
         
         if (navigator.share) {
             navigator.share({
-                title: 'SOS Alert - ' + sosData.username,
+                title: 'SOS Alert - ' + window.sosData.username,
                 text: text
             }).catch(function(error) {
                  if (error.name !== 'AbortError') {
-                    // Fallback to copy if share is supported but fails (e.g., user cancels, although it shouldn't hit catch on cancel for clipboard fallback)
                     copyToClipboard(text);
                 }
             });
         } else {
             copyToClipboard(text);
         }
+    } else {
+        customAlert('Location data not available yet.');
+    }
+};
+
+function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+            customAlert('Location link copied to clipboard!', 'Success');
+        }).catch(function(err) {
+            fallbackCopy(text);
+        });
+    } else {
+        fallbackCopy(text);
+    }
+}
+
+function fallbackCopy(text) {
+    var textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+        document.execCommand('copy');
+        customAlert('Location link copied to clipboard!', 'Success');
+    } catch (err) {
+        customAlert('Could not automatically copy. Please copy manually: ' + text);
+    }
+    document.body.removeChild(textarea);
+}
+
+// Main application logic
+document.addEventListener('DOMContentLoaded', function() {
+    // Extract SOS data from template
+    window.sosData = {
+        id: parseInt('{{ sos.id }}'),
+        lat: parseFloat('{{ sos.lat }}'),
+        lng: parseFloat('{{ sos.lng }}'),
+        accuracy: parseFloat('{% if sos.accuracy %}{{ sos.accuracy }}{% else %}20{% endif %}'),
+        username: '{{ sos.username }}',
+        status: '{{ sos.status }}'
     };
 
-    function copyToClipboard(text) {
-        // Use modern clipboard API first
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text).then(function() {
-                customAlert('Location link copied to clipboard!', 'Success');
-            }).catch(function(err) {
-                console.error('Failed to copy using clipboard API:', err);
-                // Fallback for clipboard failures
-                fallbackCopy(text);
-            });
-        } else {
-            // Fallback for non-clipboard browsers (iFrame limitations might force this)
-            fallbackCopy(text);
-        }
+    window.currentLat = window.sosData.lat;
+    window.currentLng = window.sosData.lng;
+    let map = null;
+    let marker = null;
+    let accuracyCircle = null;
+    let updateInterval = null;
+
+    // Validate coordinates
+    if (!window.sosData.lat || !window.sosData.lng || isNaN(window.sosData.lat) || isNaN(window.sosData.lng)) {
+        document.getElementById('map').innerHTML = 
+            '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:red;font-size:20px;">❌ Invalid location data</div>';
+        return;
     }
 
-    function fallbackCopy(text) {
-        var textarea = document.createElement('textarea');
-        textarea.value = text;
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        document.body.appendChild(textarea);
-        textarea.select();
-        try {
-            document.execCommand('copy');
-            customAlert('Location link copied to clipboard!', 'Success');
-        } catch (err) {
-            // Final fallback to just displaying the text
-            customAlert('Could not automatically copy. Please copy manually: ' + text);
-        }
-        document.body.removeChild(textarea);
-    }
+    // Initialize map
+    map = L.map('map').setView([window.sosData.lat, window.sosData.lng], 17);
 
-    // Start live updates
-    updateLocation();
-    updateInterval = setInterval(updateLocation, 4000);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19
+    }).addTo(map);
 
-    // Cleanup on page unload
-    window.addEventListener('beforeunload', function() {
-        if (updateInterval) {
-            clearInterval(updateInterval);
-        }
+    // Create marker based on status
+    var markerClass = window.sosData.status === 'resolved' ? 'sos-marker resolved' : 'sos-marker';
+    var sosIcon = L.divIcon({
+        className: 'sos-marker-container',
+        html: '<div class="' + markerClass + '"></div>',
+        iconSize: [34, 34],
+        iconAnchor: [17, 17]
     });
-})();
+
+    marker = L.marker([window.sosData.lat, window.sosData.lng], { icon: sosIcon }).addTo(map);
+    
+    var popupIcon = window.sosData.status === 'resolved' ? '✓' : '🚨';
+    var popupStatus = window.sosData.status === 'resolved' ? 'Resolved' : 'SOS Active';
+    marker.bindPopup('<strong>' + popupIcon + ' ' + window.sosData.username + '</strong><br>' + popupStatus).openPopup();
+
+    // Accuracy circle - different color for resolved
+    var circleColor = window.sosData.status === 'resolved' ? '#10b981' : '#dc2626';
+    accuracyCircle = L.circle([window.sosData.lat, window.sosData.lng], {
+        radius: window.sosData.accuracy,
+        color: circleColor,
+        fillColor: circleColor,
+        fillOpacity: 0.15,
+        weight: 2
+    }).addTo(map);
+
+    // Live update function (only for active SOS)
+    if (window.sosData.status === 'active') {
+        function updateLocation() {
+            fetch('/api/network_sos')
+                .then(function(response) {
+                    if (!response.ok) throw new Error('Failed to fetch SOS data');
+                    return response.json();
+                })
+                .then(function(alerts) {
+                    var currentSos = alerts.find(function(s) { return s.id === window.sosData.id; });
+                    
+                    if (!currentSos) {
+                        document.getElementById('lastUpdate').textContent = 'SOS Ended';
+                        document.getElementById('lastUpdate').style.color = '#fbbf24';
+                        clearInterval(updateInterval);
+                        return;
+                    }
+                    
+                    if (currentSos.status !== 'active') {
+                        document.getElementById('lastUpdate').textContent = 'SOS Resolved';
+                        document.getElementById('lastUpdate').style.color = '#10b981';
+                        clearInterval(updateInterval);
+                        
+                        // Update marker to green checkmark
+                        var resolvedIcon = L.divIcon({
+                            className: 'sos-marker-container',
+                            html: '<div class="sos-marker resolved"></div>',
+                            iconSize: [34, 34],
+                            iconAnchor: [17, 17]
+                        });
+                        marker.setIcon(resolvedIcon);
+                        accuracyCircle.setStyle({ color: '#10b981', fillColor: '#10b981' });
+                        
+                        setTimeout(function() {
+                            location.reload();
+                        }, 2000);
+                        return;
+                    }
+                    
+                    var newLat = parseFloat(currentSos.lat);
+                    var newLng = parseFloat(currentSos.lng);
+                    var newAccuracy = currentSos.accuracy || 20;
+                    
+                    if (newLat && newLng && !isNaN(newLat) && !isNaN(newLng) && 
+                        (newLat !== window.currentLat || newLng !== window.currentLng)) {
+                        window.currentLat = newLat;
+                        window.currentLng = newLng;
+                        
+                        map.setView([newLat, newLng], 17, { animate: true, duration: 1.2 });
+                        marker.setLatLng([newLat, newLng]);
+                        accuracyCircle.setLatLng([newLat, newLng]);
+                        accuracyCircle.setRadius(newAccuracy);
+                        
+                        marker.setPopupContent(
+                            '<strong>🚨 ' + window.sosData.username + '</strong><br>' +
+                            'Location Updated<br>' +
+                            '<small>' + newLat.toFixed(6) + ', ' + newLng.toFixed(6) + '</small>'
+                        ).openPopup();
+                    }
+                    
+                    var now = new Date();
+                    document.getElementById('lastUpdate').textContent = now.toLocaleTimeString();
+                    document.getElementById('lastUpdate').style.color = 'white';
+                    document.getElementById('accuracy').textContent = Math.round(newAccuracy);
+                })
+                .catch(function(error) {
+                    console.error('Update error:', error);
+                    document.getElementById('lastUpdate').textContent = 'Connection error';
+                    document.getElementById('lastUpdate').style.color = '#ef4444';
+                });
+        }
+
+        // Start live updates
+        updateLocation();
+        updateInterval = setInterval(updateLocation, 4000);
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            if (updateInterval) clearInterval(updateInterval);
+        });
+    } else {
+        // For resolved SOS, just show static location
+        document.getElementById('lastUpdate').textContent = 'Resolved';
+        document.getElementById('lastUpdate').style.color = '#10b981';
+    }
+});
 </script>
 {% endblock %}

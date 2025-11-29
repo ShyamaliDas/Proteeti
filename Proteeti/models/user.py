@@ -109,10 +109,12 @@ class SOSAlert(db.Model):
     lat = db.Column(db.Float, nullable=False)
     lng = db.Column(db.Float, nullable=False)
     accuracy = db.Column(db.Float, nullable=True)
-    status = db.Column(db.String(20), default='active')  # active, resolved
+    status = db.Column(db.String(20), default='active')  # active, resolved, historical
     is_live = db.Column(db.Boolean, default=True)
-    last_updated = db.Column(db.String(50), default=bd_now)  # For live tracking
+    last_updated = db.Column(db.String(50), default=bd_now)
     created_at = db.Column(db.String(50), default=bd_now, index=True)
+    resolved_at = db.Column(db.String(50), nullable=True)  # NEW: When it was resolved
+    resolved_by = db.Column(db.String(80), nullable=True)  # NEW: Who resolved it
     
     user = db.relationship('User', backref='sos_alerts')
     
@@ -127,7 +129,9 @@ class SOSAlert(db.Model):
             'status': self.status,
             'is_live': self.is_live,
             'last_updated': self.last_updated,
-            'created_at': self.created_at
+            'created_at': self.created_at,
+            'resolved_at': self.resolved_at,  # NEW
+            'resolved_by': self.resolved_by   # NEW
         }
 
 class Admin(db.Model):
@@ -181,3 +185,34 @@ class NetworkConnection(db.Model):
             'created_at': self.created_at,
             'accepted_at': self.accepted_at
         }
+    
+class Notification(db.Model):
+    __tablename__ = 'notifications'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    type = db.Column(db.String(50), nullable=False)  # 'sos_alert', 'connection_request', etc.
+    title = db.Column(db.String(200), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    link = db.Column(db.String(500))  # Where to go when clicked
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=bd_now, index=True)
+    
+    # Extra data (JSON)
+    data = db.Column(db.JSON, default=dict)
+    
+    user = db.relationship('User', backref='notifications')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'type': self.type,
+            'title': self.title,
+            'message': self.message,
+            'link': self.link,
+            'is_read': self.is_read,
+            'created_at': self.created_at.isoformat(),
+            'data': self.data
+        }
+    
+SafetyConnection = NetworkConnection

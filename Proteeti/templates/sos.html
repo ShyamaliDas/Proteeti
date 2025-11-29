@@ -1,157 +1,743 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="text-center">
-<h2>Emergency SOS</h2>
-<p class="text-muted">Send your location and record audio. Your network will track you live.</p>
-<button id="sosBtn" class="btn btn-danger btn-lg mt-3 p-4 fs-3" style="background-color: #8b0606; border-color: #8B0000; border-radius: 15px; min-width: 200px;">
-    🚨 SEND SOS NOW
-</button>
-<button id="stopBtn" class="btn btn-secondary btn-lg mt-4 p-3 fs-4"
-        style="border-radius: 12px; min-width: 160px; display: none;">
-    🛑 STOP RECORDING
-</button>
 
-<div id="status" class="mt-3"></div>
-<div id="timer" class="mt-2" style="font-size: 20px; font-weight: bold; display: none;"></div>
-<div id="result" class="mt-3"></div>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+<style>
+:root {
+  --organza-peach: #FBEEDA;
+  --bordeaux: #7B002C;
+  --purple-tulip: #40002B;
+  --bloody-mary: #BA0105;
+  --furious-tiger: #EA5814;
+  --white: #FFFFFF;
+  --soft-shadow: rgba(123, 0, 44, 0.08);
+}
+
+.sos-page {
+    min-height: 100vh;
+    background: var(--organza-peach);
+}
+
+.sos-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 50px 40px;
+}
+
+.sos-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.sos-header h1 {
+    font-size: 36px;
+    font-weight: 800;
+    color: var(--bordeaux);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+}
+
+.sos-header h1 i {
+    color: var(--bloody-mary);
+}
+
+.sos-header p {
+    font-size: 16px;
+    color: var(--purple-tulip);
+    opacity: 0.85;
+}
+
+.location-status {
+    padding: 20px;
+    border-radius: 16px;
+    margin: 30px 0;
+    font-size: 16px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.location-status i {
+    font-size: 24px;
+}
+
+.status-info { 
+    background: #fff5f0; 
+    color: var(--bordeaux); 
+    border: 2px solid rgba(123, 0, 44, 0.2); 
+}
+
+.status-success { 
+    background: #d1fae5; 
+    color: #065f46; 
+    border: 2px solid #6ee7b7; 
+}
+
+.status-warning { 
+    background: #fef3c7; 
+    color: var(--furious-tiger); 
+    border: 2px solid #fcd34d; 
+}
+
+.status-error { 
+    background: #fee2e2; 
+    color: var(--bloody-mary); 
+    border: 2px solid #fca5a5; 
+}
+
+/* SLIDING ANIMATION CONTAINER */
+.sos-action-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 30px;
+    margin: 40px 0;
+    position: relative;
+    min-height: 250px;
+}
+
+.sos-button-wrapper {
+    transition: all 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.sos-button-wrapper.slide-left {
+    transform: translateX(-150px) scale(0.8);
+}
+
+.sos-button {
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    border: none;
+    font-size: 24px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 10px 40px rgba(123, 0, 44, 0.3);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.sos-button i {
+    font-size: 48px;
+}
+
+.sos-button .btn-text {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: 2px;
+}
+
+.sos-button .btn-subtext {
+    font-size: 14px;
+    font-weight: 500;
+    opacity: 0.9;
+}
+
+.sos-button.ready {
+    background: linear-gradient(135deg, var(--bloody-mary) 0%, var(--bordeaux) 100%);
+    color: white;
+}
+
+.sos-button.ready:hover {
+    transform: scale(1.08);
+    box-shadow: 0 15px 50px rgba(186, 1, 5, 0.6);
+}
+
+.sos-button.ready:active {
+    transform: scale(1.02);
+}
+
+.sos-button.disabled {
+    background: linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%);
+    color: #6b7280;
+    cursor: not-allowed;
+}
+
+.sos-button.loading {
+    background: linear-gradient(135deg, var(--furious-tiger) 0%, var(--bloody-mary) 100%);
+    color: white;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.sos-button.success {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+/* AUDIO RECORDING PANEL - SLIDES IN FROM RIGHT */
+.audio-recording-panel {
+    position: absolute;
+    right: 0;
+    background: white;
+    border: 3px solid var(--bloody-mary);
+    border-radius: 16px;
+    padding: 20px 18px;
+    min-width: 240px;
+    box-shadow: 0 10px 40px rgba(186, 1, 5, 0.3);
+    transform: translateX(400px);
+    opacity: 0;
+    transition: all 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    pointer-events: none;
+}
+
+.audio-recording-panel.active {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: all;
+}
+
+.audio-recording-panel h3 {
+    color: var(--bordeaux);
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.audio-recording-panel h3 i {
+    color: var(--bloody-mary);
+    font-size: 24px;
+}
+
+.recording-visualizer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 60px;
+    margin: 20px 0;
+}
+
+.recording-bar {
+    width: 6px;
+    background: var(--bloody-mary);
+    border-radius: 3px;
+    animation: wave 1s ease-in-out infinite;
+}
+
+.recording-bar:nth-child(1) { animation-delay: 0s; }
+.recording-bar:nth-child(2) { animation-delay: 0.1s; }
+.recording-bar:nth-child(3) { animation-delay: 0.2s; }
+.recording-bar:nth-child(4) { animation-delay: 0.3s; }
+.recording-bar:nth-child(5) { animation-delay: 0.4s; }
+.recording-bar:nth-child(6) { animation-delay: 0.5s; }
+.recording-bar:nth-child(7) { animation-delay: 0.4s; }
+.recording-bar:nth-child(8) { animation-delay: 0.3s; }
+
+@keyframes wave {
+    0%, 100% { height: 15px; }
+    50% { height: 50px; }
+}
+
+.audio-timer-display {
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--bordeaux);
+    text-align: center;
+    margin: 15px 0;
+    font-family: 'Courier New', monospace;
+}
+
+.stop-recording-btn {
+    width: 100%;
+    background: var(--bloody-mary);
+    color: white;
+    border: none;
+    padding: 14px 20px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.stop-recording-btn:hover {
+    background: var(--purple-tulip);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(123, 0, 44, 0.4);
+}
+
+.stop-recording-btn i {
+    font-size: 20px;
+}
+
+.accuracy-display {
+    display: none;
+    text-align: center;
+    margin: 20px 0;
+}
+
+.accuracy-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 24px;
+    border-radius: 25px;
+    font-size: 15px;
+    font-weight: 700;
+    color: white;
+}
+
+.accuracy-indicator i {
+    font-size: 20px;
+}
+
+.tips-box {
+    background: #fff5f0;
+    border: 2px solid rgba(123, 0, 44, 0.2);
+    border-radius: 16px;
+    padding: 25px;
+    margin: 30px 0;
+    text-align: left;
+    display: none;
+}
+
+.tips-box h4 {
+    color: var(--bordeaux);
+    margin-bottom: 15px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.tips-box h4 i {
+    font-size: 24px;
+    color: var(--bloody-mary);
+}
+
+.tips-box ul {
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+}
+
+.tips-box li {
+    color: var(--purple-tulip);
+    margin: 10px 0;
+    padding-left: 30px;
+    position: relative;
+}
+
+.tips-box li:before {
+    content: "•";
+    position: absolute;
+    left: 10px;
+    font-weight: bold;
+    color: var(--bloody-mary);
+}
+
+.info-card {
+    background: var(--white);
+    border: 2px solid rgba(123, 0, 44, 0.15);
+    border-radius: 16px;
+    padding: 25px;
+    margin-top: 30px;
+}
+
+.info-card h5 {
+    color: var(--bordeaux);
+    font-weight: 700;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.info-card h5 i {
+    font-size: 24px;
+    color: var(--bloody-mary);
+}
+
+.info-card .info-step {
+    display: flex;
+    align-items: start;
+    gap: 15px;
+    margin: 12px 0;
+    color: var(--purple-tulip);
+}
+
+.info-card .info-step i {
+    font-size: 20px;
+    margin-top: 2px;
+    color: var(--bordeaux);
+}
+
+.audio-status {
+    display: none;
+    margin: 25px 0;
+    padding: 20px;
+    background: #fff5f0;
+    border: 2px solid rgba(234, 88, 20, 0.3);
+    border-radius: 16px;
+    text-align: center;
+}
+
+.audio-status i {
+    font-size: 32px;
+    color: var(--furious-tiger);
+    margin-bottom: 10px;
+}
+
+.audio-timer {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--bordeaux);
+    margin: 10px 0;
+}
+
+@media (max-width: 768px) {
+    .sos-container {
+        padding: 30px 20px;
+    }
+    
+    .sos-header h1 {
+        font-size: 28px;
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .sos-action-container {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .sos-button-wrapper.slide-left {
+        transform: translateY(-80px) scale(0.7);
+    }
+    
+    .audio-recording-panel {
+        position: relative;
+        transform: translateY(100px);
+        right: auto;
+    }
+    
+    .audio-recording-panel.active {
+        transform: translateY(0);
+    }
+    
+    .sos-button {
+        width: 180px;
+        height: 180px;
+    }
+    
+    .sos-button i {
+        font-size: 40px;
+    }
+    
+    .sos-button .btn-text {
+        font-size: 28px;
+    }
+}
+</style>
+
+<div class="sos-page">
+    <div class="sos-container">
+        <div class="sos-header">
+            <h1>
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                Emergency SOS
+            </h1>
+            <p>Send immediate alert to your trusted contacts</p>
+        </div>
+
+        <div id="locationStatus" class="location-status status-info">
+            <i class="bi bi-hourglass-split"></i>
+            <span>Checking GPS status...</span>
+        </div>
+
+        <!-- SLIDING ACTION CONTAINER -->
+        <div class="sos-action-container">
+            <div id="sosButtonWrapper" class="sos-button-wrapper">
+                <button id="sosButton" class="sos-button disabled" onclick="sendSOSWithLocation()">
+                    <i class="bi bi-exclamation-circle-fill"></i>
+                    <div class="btn-text">SOS</div>
+                    <div class="btn-subtext">Initializing...</div>
+                </button>
+            </div>
+
+            <!-- AUDIO RECORDING PANEL -->
+            <div id="audioRecordingPanel" class="audio-recording-panel">
+                <h3>
+                    <i class="bi bi-mic-fill"></i>
+                    Recording Audio
+                </h3>
+                
+                <div class="recording-visualizer">
+                    <div class="recording-bar"></div>
+                    <div class="recording-bar"></div>
+                    <div class="recording-bar"></div>
+                    <div class="recording-bar"></div>
+                    <div class="recording-bar"></div>
+                    <div class="recording-bar"></div>
+                    <div class="recording-bar"></div>
+                    <div class="recording-bar"></div>
+                </div>
+
+                <div class="audio-timer-display" id="audioTimerDisplay">0:00</div>
+                <div style="text-align: center; color: var(--purple-tulip); font-size: 14px; opacity: 0.8;">
+                    Max: 2:00
+                </div>
+
+                <button id="stopRecordingBtn" class="stop-recording-btn" onclick="stopAudioRecording()">
+                    <i class="bi bi-stop-circle-fill"></i>
+                    Stop Recording
+                </button>
+            </div>
+        </div>
+
+        <div id="accuracyDisplay" class="accuracy-display">
+            <div class="accuracy-indicator" id="accuracyBadge">
+                <i class="bi bi-geo-alt-fill"></i>
+                <span></span>
+            </div>
+        </div>
+
+        <div id="audioStatus" class="audio-status">
+            <i class="bi bi-mic-fill"></i>
+            <div>Recording emergency audio...</div>
+            <div class="audio-timer" id="audioTimer">0:00 / 2:00</div>
+        </div>
+
+        <div id="tipsBox" class="tips-box">
+            <h4>
+                <i class="bi bi-lightbulb-fill"></i>
+                Improve Location Accuracy
+            </h4>
+            <ul>
+                <li>Move outdoors or near a window</li>
+                <li>Wait 10-20 seconds for GPS to stabilize</li>
+                <li>Disable battery saver mode</li>
+                <li>Ensure location services are enabled</li>
+            </ul>
+        </div>
+
+        <div class="info-card">
+            <h5>
+                <i class="bi bi-info-circle-fill"></i>
+                What happens when you press SOS?
+            </h5>
+            <div class="info-step">
+                <i class="bi bi-1-circle-fill"></i>
+                <span>Your exact location is captured with GPS coordinates</span>
+            </div>
+            <div class="info-step">
+                <i class="bi bi-2-circle-fill"></i>
+                <span>Emergency audio recording starts automatically (2 minutes)</span>
+            </div>
+            <div class="info-step">
+                <i class="bi bi-3-circle-fill"></i>
+                <span>All trusted contacts receive email alerts with your location</span>
+            </div>
+            <div class="info-step">
+                <i class="bi bi-4-circle-fill"></i>
+                <span>Live tracking begins and your network can monitor your status</span>
+            </div>
+        </div>
+    </div>
 </div>
 
+<script src="{{ url_for('static', filename='js/location-handler.js') }}"></script>
 <script>
+let locationHandler = null;
+let currentPosition = null;
+let isReady = false;
+
+// Audio recording variables
 let mediaRecorder;
 let recordedAudioChunks = [];
 let recordingActive = false;
-let timerInterval = null;
+let audioTimerInterval = null;
 let stream = null;
-let activeSosId = null;
-let locationUpdateInterval = null;
 
-document.getElementById('sosBtn').addEventListener('click', async function() {
-    this.disabled = true;
-    document.getElementById('status').innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Getting location...</div>';
-
-    if (!navigator.geolocation) {
-        document.getElementById('status').innerHTML =
-            '<div class="alert alert-danger">Location unavailable. Please enable device location.</div>';
-        this.disabled = false;
-        return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-        async (position) => {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
-            const accuracy = position.coords.accuracy;
-
-            try {
-                // Send initial SOS
-                const locationResponse = await fetch('/send_sos', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ latitude: lat, longitude: lng, accuracy: accuracy })
-                });
-
-                const locationResult = await locationResponse.json();
-
-                if (!locationResponse.ok) {
-                    document.getElementById('status').innerHTML =
-                        '<div class="alert alert-danger">Error sending location: ' + locationResult.error + '</div>';
-                    document.getElementById('sosBtn').disabled = false;
-                    return;
-                }
-
-                activeSosId = locationResult.alert_id;
-
-                document.getElementById('status').innerHTML =
-                    '<div class="alert alert-success"><i class="fas fa-check"></i> SOS Sent! Your network is tracking you live. Recording audio...</div>';
-                
-                // Start live location updates
-                startLiveLocationUpdates();
-                
-                // Start audio recording
-                await startAudioRecording();
-
-            } catch (error) {
-                document.getElementById('status').innerHTML =
-                    '<div class="alert alert-danger">Error: ' + error.message + '</div>';
-                document.getElementById('sosBtn').disabled = false;
-            }
-        },
-        (error) => {
-            let errorMsg = 'Location unavailable. ';
-            if (error.code === 1) errorMsg += 'Permission denied. Please enable device location.';
-            else if (error.code === 2) errorMsg += 'Position unavailable. Try moving to an open area.';
-            else if (error.code === 3) errorMsg += 'Timeout. Try again in a moment.';
-            document.getElementById('status').innerHTML =
-                '<div class="alert alert-danger">' + errorMsg + '</div>';
-            document.getElementById('sosBtn').disabled = false;
-        },
-        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-    );
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', () => {
+    locationHandler = new LocationHandler();
+    checkLocationStatus();
 });
 
-// Live location updates every 5 seconds
-function startLiveLocationUpdates() {
-    locationUpdateInterval = setInterval(() => {
-        if (!activeSosId) return;
+/**
+ * Check location status on page load
+ */
+async function checkLocationStatus() {
+    try {
+        const position = await locationHandler.quickCheck();
+        const accuracy = position.coords.accuracy;
         
-        navigator.geolocation.getCurrentPosition(
-            async (position) => {
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
-                const accuracy = position.coords.accuracy;
-                
-                try {
-                    await fetch('/api/update_sos_location', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            sos_id: activeSosId,
-                            lat: lat,
-                            lng: lng,
-                            accuracy: accuracy
-                        })
-                    });
-                    console.log('Location updated:', lat, lng);
-                } catch (error) {
-                    console.error('Failed to update location:', error);
-                }
-            },
-            (error) => {
-                console.error('Geolocation error:', error);
-            },
-            { enableHighAccuracy: true, maximumAge: 0 }
-        );
-    }, 5000); // Update every 5 seconds
+        updateLocationDisplay(accuracy);
+        enableSOSButton(position);
+        
+    } catch (error) {
+        const statusDiv = document.getElementById('locationStatus');
+        statusDiv.innerHTML = '<i class="bi bi-x-circle-fill"></i><span>Location unavailable. Please enable location permissions.</span>';
+        statusDiv.className = 'location-status status-error';
+        document.getElementById('tipsBox').style.display = 'block';
+    }
 }
 
-document.getElementById('stopBtn').addEventListener('click', function() {
-    if (!mediaRecorder || !recordingActive) return;
-
-    recordingActive = false;
+/**
+ * Update location display
+ */
+function updateLocationDisplay(accuracy) {
+    const level = locationHandler.getAccuracyLevel(accuracy);
     
-    if (timerInterval) {
-        clearInterval(timerInterval);
-        timerInterval = null;
+    const statusDiv = document.getElementById('locationStatus');
+    statusDiv.innerHTML = `<i class="bi bi-geo-alt-fill"></i><span>Current accuracy: <strong>${Math.round(accuracy)}m</strong> (${level.text})</span>`;
+    statusDiv.className = `location-status status-${level.type}`;
+    
+    const badge = document.getElementById('accuracyBadge');
+    badge.querySelector('span').textContent = `${Math.round(accuracy)}m - ${level.text}`;
+    badge.style.background = level.color;
+    document.getElementById('accuracyDisplay').style.display = 'block';
+    
+    // Show tips if accuracy is poor
+    if (accuracy > 100) {
+        document.getElementById('tipsBox').style.display = 'block';
+    }
+}
+
+/**
+ * Enable SOS button
+ */
+function enableSOSButton(position) {
+    currentPosition = position;
+    isReady = true;
+    
+    const btn = document.getElementById('sosButton');
+    btn.className = 'sos-button ready';
+    btn.innerHTML = `
+        <i class="bi bi-exclamation-circle-fill"></i>
+        <div class="btn-text">SEND</div>
+        <div class="btn-subtext">SOS</div>
+    `;
+}
+
+/**
+ * Send SOS with accurate location
+ */
+async function sendSOSWithLocation() {
+    if (!isReady) {
+        alert('Please wait for location to be ready');
+        return;
     }
     
-    if (locationUpdateInterval) {
-        clearInterval(locationUpdateInterval);
-        locationUpdateInterval = null;
+    const btn = document.getElementById('sosButton');
+    btn.className = 'sos-button loading';
+    btn.innerHTML = `
+        <i class="bi bi-hourglass-split"></i>
+        <div class="btn-text">WAIT</div>
+        <div class="btn-subtext">Getting Location...</div>
+    `;
+    btn.disabled = true;
+    
+    try {
+        // Get high-accuracy location
+        const position = await locationHandler.getAccurateLocation({
+            maxWaitTime: 15000,
+            acceptableAccuracy: 50,
+            minimumAccuracy: 500,
+            onStatusUpdate: (message, type) => {
+                const statusDiv = document.getElementById('locationStatus');
+                statusDiv.innerHTML = `<i class="bi bi-hourglass-split"></i><span>${message}</span>`;
+                statusDiv.className = `location-status status-${type}`;
+            }
+        });
+        
+        const accuracy = position.coords.accuracy;
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+
+        // Confirm if accuracy is not great
+        if (accuracy > 100) {
+            const confirmMsg = 
+                `⚠ Location accuracy: ${Math.round(accuracy)}m\n\n` +
+                `Your exact position could be off by up to ${Math.round(accuracy)} meters.\n\n` +
+                `This is common indoors or in areas with poor GPS signal.\n\n` +
+                `Send SOS with current location?`;
+            
+            if (!confirm(confirmMsg)) {
+                resetSOSButton();
+                return;
+            }
+        }
+        
+        // Send SOS to server
+        const response = await fetch('/send_sos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                latitude: lat,
+                longitude: lng,
+                accuracy: accuracy
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            btn.className = 'sos-button success';
+            btn.innerHTML = `
+                <i class="bi bi-check-circle-fill"></i>
+                <div class="btn-text">SENT</div>
+                <div class="btn-subtext">Success!</div>
+            `;
+            
+            const statusDiv = document.getElementById('locationStatus');
+            statusDiv.innerHTML = '<i class="bi bi-check-circle-fill"></i><span>SOS alert sent successfully! Your contacts have been notified.</span>';
+            statusDiv.className = 'location-status status-success';
+            
+            // TRIGGER SLIDING ANIMATION
+            setTimeout(() => {
+                document.getElementById('sosButtonWrapper').classList.add('slide-left');
+                document.getElementById('audioRecordingPanel').classList.add('active');
+            }, 500);
+            
+            // Start audio recording
+            setTimeout(() => {
+                startAudioRecording();
+            }, 1100);
+            
+        } else {
+            throw new Error(result.error || 'Failed to send SOS');
+        }
+        
+    } catch (error) {
+        console.error('SOS Error:', error);
+        alert('Failed to send SOS: ' + error.message);
+        resetSOSButton();
     }
+}
 
-    document.getElementById('stopBtn').style.display = 'none';
-    document.getElementById('timer').style.display = 'none';
-    mediaRecorder.stop();
-});
-
+/**
+ * Start automatic audio recording
+ */
 async function startAudioRecording() {
     try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-        document.getElementById('timer').style.display = 'block';
-        document.getElementById('timer').innerHTML = 'Recording: 0s / 120s';
-        document.getElementById('stopBtn').style.display = 'inline-block';
-
+        
         mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
         recordedAudioChunks = [];
         recordingActive = true;
@@ -163,14 +749,8 @@ async function startAudioRecording() {
         };
 
         mediaRecorder.onstop = async () => {
-            if (timerInterval) {
-                clearInterval(timerInterval);
-                timerInterval = null;
-            }
-            
-            if (locationUpdateInterval) {
-                clearInterval(locationUpdateInterval);
-                locationUpdateInterval = null;
+            if (audioTimerInterval) {
+                clearInterval(audioTimerInterval);
             }
             
             if (stream) {
@@ -179,26 +759,21 @@ async function startAudioRecording() {
             }
 
             const audioBlob = new Blob(recordedAudioChunks, { type: 'audio/webm' });
-            await sendAudio(audioBlob);
-            document.getElementById('stopBtn').style.display = 'none';
-            document.getElementById('timer').style.display = 'none';
-            recordingActive = false;
+            await sendAudioToServer(audioBlob);
         };
 
+        // Update timer
         let seconds = 0;
-        timerInterval = setInterval(() => {
+        const maxSeconds = 120;
+        audioTimerInterval = setInterval(() => {
             seconds++;
-            document.getElementById('timer').innerHTML = `Recording: ${seconds}s / 120s`;
+            const minutes = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            document.getElementById('audioTimerDisplay').textContent = 
+                `${minutes}:${secs.toString().padStart(2, '0')}`;
 
-            if (seconds >= 120) {
-                if (recordingActive) {
-                    recordingActive = false;
-                    clearInterval(timerInterval);
-                    timerInterval = null;
-                    document.getElementById('stopBtn').style.display = 'none';
-                    document.getElementById('timer').style.display = 'none';
-                    mediaRecorder.stop();
-                }
+            if (seconds >= maxSeconds) {
+                stopAudioRecording();
             }
         }, 1000);
 
@@ -206,24 +781,35 @@ async function startAudioRecording() {
 
     } catch (error) {
         console.error('Microphone error:', error);
-        let errorMsg = 'Cannot access microphone: ' + error.message;
-        if (error.name === 'NotAllowedError') {
-            errorMsg = 'Microphone permission denied. Please enable it in settings.';
-        }
-        document.getElementById('status').innerHTML =
-            '<div class="alert alert-danger">' + errorMsg + '</div>';
-        document.getElementById('timer').style.display = 'none';
-        document.getElementById('sosBtn').disabled = false;
-        document.getElementById('stopBtn').style.display = 'none';
+        document.getElementById('audioRecordingPanel').innerHTML = 
+            '<div style="text-align: center; color: var(--bloody-mary);"><i class="bi bi-mic-mute-fill" style="font-size: 40px;"></i><p>Microphone not available</p></div>';
+        
+        // Continue to account page even without audio
+        setTimeout(() => {
+            window.location.href = '/account';
+        }, 2000);
     }
 }
 
-async function sendAudio(audioBlob) {
-    try {
-        document.getElementById('timer').style.display = 'none';
-        document.getElementById('status').innerHTML =
-            '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Sending audio...</div>';
+/**
+ * Stop audio recording
+ */
+function stopAudioRecording() {
+    if (!mediaRecorder || !recordingActive) return;
 
+    recordingActive = false;
+    mediaRecorder.stop();
+    
+    // Update UI
+    document.getElementById('audioRecordingPanel').innerHTML = 
+        '<div style="text-align: center;"><i class="bi bi-check-circle-fill" style="font-size: 50px; color: #10b981;"></i><h3 style="color: var(--bordeaux); margin-top: 15px;">Recording Stopped</h3><p style="color: var(--purple-tulip);">Uploading audio...</p></div>';
+}
+
+/**
+ * Send audio to server
+ */
+async function sendAudioToServer(audioBlob) {
+    try {
         const formData = new FormData();
         formData.append('audio', audioBlob, 'emergency_audio.webm');
 
@@ -235,20 +821,53 @@ async function sendAudio(audioBlob) {
         const result = await response.json();
 
         if (response.ok) {
-            document.getElementById('status').innerHTML =
-                '<div class="alert alert-success"><i class="fas fa-check-circle"></i> <strong>SOS Complete!</strong><br/>Your network can now track you live.</div>';
+            document.getElementById('audioRecordingPanel').innerHTML = 
+                '<div style="text-align: center;"><i class="bi bi-check-circle-fill" style="font-size: 50px; color: #10b981;"></i><h3 style="color: var(--bordeaux); margin-top: 15px;">Complete!</h3><p style="color: var(--purple-tulip);">Audio sent successfully</p></div>';
+            
+            // Redirect to account page
+            setTimeout(() => {
+                window.location.href = '/account';
+            }, 1500);
         } else {
-            document.getElementById('status').innerHTML =
-                '<div class="alert alert-warning">Location sent and tracking active, but audio failed: ' + result.error + '</div>';
+            throw new Error(result.error);
         }
     } catch (error) {
         console.error('Error sending audio:', error);
-        document.getElementById('status').innerHTML =
-            '<div class="alert alert-warning">Location sent and tracking active, but audio failed: ' + error.message + '</div>';
-    } finally {
-        document.getElementById('sosBtn').disabled = false;
-        recordedAudioChunks = [];
+        document.getElementById('audioRecordingPanel').innerHTML = 
+            '<div style="text-align: center;"><i class="bi bi-exclamation-triangle-fill" style="font-size: 50px; color: var(--bloody-mary);"></i><h3 style="color: var(--bordeaux); margin-top: 15px;">Upload Failed</h3><p style="color: var(--purple-tulip);">Location still sent</p></div>';
+        
+        setTimeout(() => {
+            window.location.href = '/account';
+        }, 2000);
     }
 }
+
+/**
+ * Reset SOS button
+ */
+function resetSOSButton() {
+    const btn = document.getElementById('sosButton');
+    btn.className = 'sos-button ready';
+    btn.innerHTML = `
+        <i class="bi bi-exclamation-circle-fill"></i>
+        <div class="btn-text">SEND</div>
+        <div class="btn-subtext">SOS</div>
+    `;
+    btn.disabled = false;
+    isReady = true;
+}
+
+// Real-time accuracy monitoring
+setInterval(async () => {
+    if (isReady) {
+        try {
+            const position = await locationHandler.quickCheck();
+            updateLocationDisplay(position.coords.accuracy);
+        } catch (error) {
+            // Ignore errors in background checks
+        }
+    }
+}, 5000);
 </script>
+
 {% endblock %}
